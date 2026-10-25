@@ -1,7 +1,9 @@
 package io.github.kwn00.parkandleave.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -19,11 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,14 +35,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.kwn00.parkandleave.designsystem.LocalParkLeaveColors
+import androidx.compose.ui.unit.em
+import io.github.kwn00.parkandleave.designsystem.ParkIcon
+import io.github.kwn00.parkandleave.designsystem.ParkIconKind
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveColors
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveDimens
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveShapes
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveSpace
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveTheme
+import io.github.kwn00.parkandleave.designsystem.keepWordsTogether
 import io.github.kwn00.parkandleave.domain.CardTone
 import io.github.kwn00.parkandleave.domain.CheckSession
 import io.github.kwn00.parkandleave.domain.Gear
@@ -62,21 +75,25 @@ fun SummaryScreen(
     onManualCheck: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalParkLeaveColors.current
+    val colors = ParkLeaveTheme.colors
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(horizontal = 32.dp, vertical = 24.dp),
+            .padding(
+                start = ParkLeaveSpace.paneHorizontal,
+                end = ParkLeaveSpace.paneHorizontal,
+                top = ParkLeaveSpace.paneTop,
+            ),
     ) {
         val width = maxWidth
         Column(Modifier.fillMaxSize()) {
             SummaryHeader(state, onOpenDebug)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(ParkLeaveSpace.x3))
             when (state.session.phase) {
                 SessionPhase.FROZEN -> StatusMessage(
                     text = "주행 중에는 점검을 멈춥니다",
-                    color = colors.onCritical,
+                    icon = ParkIconKind.STEERING,
                     modifier = Modifier.weight(1f),
                 )
                 SessionPhase.IDLE -> StatusMessage(
@@ -85,7 +102,7 @@ fun SummaryScreen(
                     } else {
                         "기어를 P에 두면 점검을 시작합니다"
                     },
-                    color = colors.onSurface,
+                    icon = ParkIconKind.PARK,
                     modifier = Modifier.weight(1f),
                     extra = if (state.showManualCheck) {
                         { ManualCheckButton(onManualCheck) }
@@ -105,177 +122,130 @@ fun SummaryScreen(
 
 @Composable
 private fun SummaryHeader(state: ParkUiState, onOpenDebug: () -> Unit) {
-    val colors = LocalParkLeaveColors.current
+    val colors = ParkLeaveTheme.colors
+    val type = ParkLeaveTheme.type
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ParkLeaveDimens.headerHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             "Park & Leave",
-            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.weight(1f),
+            style = type.brand,
             color = colors.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        GearPill(state)
+        Spacer(Modifier.width(ParkLeaveSpace.x1))
+        TextButton(
+            onClick = onOpenDebug,
+            modifier = Modifier.heightIn(min = ParkLeaveDimens.touchTarget),
+            shape = ParkLeaveShapes.pill,
+            colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurfaceMuted),
         ) {
-            Text(
-                gearLabel(state),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurface,
-                maxLines = 1,
-            )
-            TextButton(
-                onClick = onOpenDebug,
-                modifier = Modifier.heightIn(min = 64.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurfaceMuted),
-            ) {
-                Text("신호 디버그", style = MaterialTheme.typography.labelLarge)
-            }
+            Text("신호 디버그", style = type.headerAction, maxLines = 1)
         }
+    }
+}
+
+@Composable
+private fun GearPill(state: ParkUiState) {
+    val colors = ParkLeaveTheme.colors
+    val parked = state.gear.gear == Gear.PARK
+    val raw = state.gear.rawValue?.toString() ?: "-"
+    val label = buildAnnotatedString {
+        withStyle(SpanStyle(color = colors.onSurfaceSubtle)) { append(raw) }
+        append(" ")
+        append(state.gear.gear.name)
+    }
+    Row(
+        modifier = Modifier
+            .height(ParkLeaveDimens.gearPillHeight)
+            .clip(ParkLeaveShapes.pill)
+            .border(ParkLeaveDimens.hairline, colors.hairline, ParkLeaveShapes.pill)
+            .semantics { contentDescription = gearLabel(state) }
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .clip(ParkLeaveShapes.pill)
+                .background(if (parked) colors.accent else colors.onSurfaceSubtle),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = ParkLeaveTheme.type.gear, color = colors.onSurface, maxLines = 1)
     }
 }
 
 @Composable
 private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
-    val colors = LocalParkLeaveColors.current
     val report = state.report
     if (state.scanning || report == null) {
-        StatusMessage("점검 중", colors.onSurface, modifier)
+        StatusMessage("점검 중", icon = null, modifier = modifier)
         return
     }
-    Column(modifier.verticalScroll(rememberScrollState())) {
-        if (report.allClear && state.cards.isEmpty()) {
-            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 400.dp))
-        } else if (report.allClear) {
-            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 360.dp))
-            Spacer(Modifier.height(28.dp))
-            Text(
-                "해결된 항목",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceMuted,
-                maxLines = 1,
-            )
-            Spacer(Modifier.height(16.dp))
-            CardGrid(state.cards, width, Modifier.fillMaxWidth())
-        } else {
-            IssueHeadline(state, report)
-            if (state.cards.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                CardGrid(state.cards, width, Modifier.fillMaxWidth())
-            }
-        }
-        ConfirmedSection(state, Modifier.fillMaxWidth())
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ConfirmedSection(state: ParkUiState, modifier: Modifier = Modifier) {
-    val colors = LocalParkLeaveColors.current
-    val lines = state.report?.uncheckedLines.orEmpty()
-    if (state.confirmed.isEmpty() && uncheckedNote(lines) == null) {
-        Spacer(modifier)
-        return
-    }
-    Column(
-        modifier
-            .padding(top = 24.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.surface)
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-    ) {
-        if (state.confirmed.isNotEmpty()) {
-            Text(
-                "정상으로 확인된 항목",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(12.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+    val calm = report.allClear && state.cards.isEmpty()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val viewport = maxHeight
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .heightIn(min = viewport)
+                    .padding(bottom = if (calm) ParkLeaveDimens.headerHeight else ParkLeaveSpace.paneBottom),
+                verticalArrangement = if (calm) Arrangement.Center else Arrangement.Top,
             ) {
-                state.confirmed.forEach { label -> ConfirmedChip(label) }
+                if (report.allClear) {
+                    AllClearHero(report)
+                    if (state.cards.isNotEmpty()) {
+                        Spacer(Modifier.height(ParkLeaveSpace.x5))
+                        SectionLabel("해결된 항목")
+                        Spacer(Modifier.height(ParkLeaveSpace.x2))
+                        CardGrid(state.cards, width)
+                    }
+                } else {
+                    IssueHeadline(state, report)
+                    if (state.cards.isNotEmpty()) {
+                        Spacer(Modifier.height(ParkLeaveSpace.x5))
+                        CardGrid(state.cards, width)
+                    }
+                }
+                ConfirmedPanel(state, top = if (calm) ParkLeaveSpace.x6 else ParkLeaveSpace.gutter)
             }
         }
-        if (uncheckedNote(lines) != null) {
-            if (state.confirmed.isNotEmpty()) Spacer(Modifier.height(16.dp))
-            UncheckedNote(lines)
-        }
     }
-}
-
-@Composable
-private fun ConfirmedChip(label: String) {
-    val colors = LocalParkLeaveColors.current
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(colors.ok)
-            .semantics { contentDescription = "$label 정상" }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        StatusGlyph(GlyphKind.CHECK, colors.onOk, Modifier.size(20.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            color = colors.onOk,
-            maxLines = 1,
-        )
-    }
-}
-
-@Composable
-private fun UncheckedNote(lines: List<String>) {
-    val note = uncheckedNote(lines) ?: return
-    val colors = LocalParkLeaveColors.current
-    Text(
-        note,
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.info)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        style = MaterialTheme.typography.bodyLarge,
-        color = colors.onInfo,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
 
 @Composable
 private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
-    val colors = LocalParkLeaveColors.current
+    val colors = ParkLeaveTheme.colors
+    val type = ParkLeaveTheme.type
     val tone = headlineTone(report.allClear, state.cards)
     Text(
-        report.headline,
-        style = MaterialTheme.typography.displayLarge,
-        color = headlineColor(tone, colors),
+        emphasizeCount(report.headline, headlineAccent(tone, colors)),
+        style = type.headline,
+        color = colors.onSurface,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
     report.tomorrowLine?.let { line ->
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(ParkLeaveSpace.x2))
         Text(
-            line,
-            style = MaterialTheme.typography.bodyLarge,
+            line.keepWordsTogether(),
+            style = type.subline,
             color = colors.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
     if (state.cards.any { !it.resolved } && !state.controlAvailable) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(ParkLeaveSpace.x2))
         Text(
-            "직접 조치하면 카드가 갱신됩니다",
-            style = MaterialTheme.typography.bodyMedium,
+            "직접 조치하면 카드가 갱신됩니다".keepWordsTogether(),
+            style = type.subline,
             color = colors.onSurfaceMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -283,90 +253,141 @@ private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
     }
 }
 
+/** The count in "확인 3건" carries the severity hue; the rest of the headline stays ink. */
+private fun emphasizeCount(headline: String, accent: Color): AnnotatedString {
+    val digits = Regex("\\d+").find(headline) ?: return AnnotatedString(headline)
+    return buildAnnotatedString {
+        append(headline.substring(0, digits.range.first))
+        withStyle(SpanStyle(color = accent)) { append(digits.value) }
+        append(headline.substring(digits.range.last + 1))
+    }
+}
+
 @Composable
-private fun AllClearHero(report: ParkingReport, modifier: Modifier) {
-    val colors = LocalParkLeaveColors.current
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.ok)
-            .padding(horizontal = 40.dp, vertical = 48.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun AllClearHero(report: ParkingReport) {
+    val colors = ParkLeaveTheme.colors
+    val type = ParkLeaveTheme.type
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = ParkLeaveSpace.x2),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusGlyph(GlyphKind.CHECK, colors.onOk, Modifier.size(96.dp))
-        Spacer(Modifier.height(20.dp))
-        Text(
-            report.headline,
-            style = MaterialTheme.typography.displayLarge,
-            color = colors.onOk,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        report.clearanceLine?.let { line ->
-            Spacer(Modifier.height(8.dp))
-            Text(
-                line,
-                style = MaterialTheme.typography.headlineMedium,
-                color = colors.onOk,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-            )
+        Box(
+            modifier = Modifier
+                .size(ParkLeaveDimens.heroBadge)
+                .clip(ParkLeaveShapes.pill)
+                .background(colors.okTint),
+            contentAlignment = Alignment.Center,
+        ) {
+            ParkIcon(ParkIconKind.CHECK, colors.ok, Modifier.size(ParkLeaveDimens.heroBadgeIcon))
         }
-        report.tomorrowLine?.let { line ->
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.width(ParkLeaveSpace.x6))
+        Column {
             Text(
-                line,
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.onOk,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
+                report.headline,
+                style = type.heroTitle,
+                color = colors.onSurface,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            report.clearanceLine?.let { line ->
+                Spacer(Modifier.height(ParkLeaveSpace.x2))
+                Text(line.keepWordsTogether(), style = type.heroSubline, color = colors.ok, maxLines = 1)
+            }
+            report.tomorrowLine?.let { line ->
+                Spacer(Modifier.height(ParkLeaveSpace.x2))
+                Text(
+                    line.keepWordsTogether(),
+                    style = type.subline,
+                    color = colors.onSurfaceMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun CardGrid(
-    cards: List<SummaryCard>,
-    width: Dp,
-    modifier: Modifier = Modifier,
-) {
+private fun CardGrid(cards: List<SummaryCard>, width: Dp) {
     if (cards.isEmpty()) return
     val columns = summaryGridColumns(width.value.toInt(), cards.size).coerceAtLeast(1)
-    val gap = 20.dp
+    val gap = ParkLeaveSpace.gutter
     val cardWidth = ((width - gap * (columns - 1)) / columns).coerceAtLeast(0.dp)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         for (row in cards.chunked(columns)) {
             Row(
                 modifier = Modifier.height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(gap),
-                verticalAlignment = Alignment.Top,
             ) {
                 for (card in row) {
-                    CheckCard(
-                        card = card,
-                        minHeight = CardHeight,
-                        modifier = Modifier.width(cardWidth).fillMaxHeight(),
-                    )
+                    CheckCard(card, Modifier.width(cardWidth).fillMaxHeight())
                 }
             }
         }
     }
 }
 
-private val CardHeight = 208.dp
+private data class CardLook(
+    val icon: ParkIconKind,
+    val iconTint: Color,
+    val tileColor: Color,
+    val edge: Color,
+    val edgeWidth: Dp,
+    val title: Color,
+    val detail: Color,
+)
+
+private fun cardLook(card: SummaryCard, colors: ParkLeaveColors): CardLook {
+    val icon = iconFor(card.id)
+    if (card.resolved) {
+        return CardLook(
+            icon = icon,
+            iconTint = colors.ok,
+            tileColor = colors.okTint,
+            edge = colors.hairline,
+            edgeWidth = ParkLeaveDimens.hairline,
+            title = colors.onSurfaceMuted,
+            detail = colors.ok,
+        )
+    }
+    return when (card.tone) {
+        CardTone.CRITICAL -> CardLook(
+            icon = icon,
+            iconTint = colors.critical,
+            tileColor = colors.criticalTint,
+            edge = colors.criticalEdge,
+            edgeWidth = ParkLeaveDimens.criticalEdge,
+            title = colors.onSurface,
+            detail = colors.onSurfaceMuted,
+        )
+        CardTone.WARN -> CardLook(
+            icon = icon,
+            iconTint = colors.warn,
+            tileColor = colors.warnTint,
+            edge = colors.hairline,
+            edgeWidth = ParkLeaveDimens.hairline,
+            title = colors.onSurface,
+            detail = colors.onSurfaceMuted,
+        )
+        CardTone.INFO -> CardLook(
+            icon = icon,
+            iconTint = colors.accent,
+            tileColor = colors.accentTint,
+            edge = colors.hairline,
+            edgeWidth = ParkLeaveDimens.hairline,
+            title = colors.onSurface,
+            detail = colors.onSurfaceMuted,
+        )
+    }
+}
 
 @Composable
-private fun CheckCard(
-    card: SummaryCard,
-    minHeight: Dp,
-    modifier: Modifier,
-) {
-    val colors = LocalParkLeaveColors.current
-    val (background, foreground) = cardColors(card.tone, colors)
+private fun CheckCard(card: SummaryCard, modifier: Modifier) {
+    val colors = ParkLeaveTheme.colors
+    val type = ParkLeaveTheme.type
+    val look = cardLook(card, colors)
     val spoken = if (card.guidance.isNotBlank()) {
         "${card.title}. ${card.detail}. ${card.guidance}"
     } else {
@@ -374,66 +395,211 @@ private fun CheckCard(
     }
     Column(
         modifier = modifier
-            .heightIn(min = minHeight)
-            .clip(RoundedCornerShape(12.dp))
-            .background(background)
+            .heightIn(min = if (card.resolved) 0.dp else ParkLeaveDimens.cardMinHeight)
+            .clip(ParkLeaveShapes.card)
+            .background(colors.surface)
+            .border(look.edgeWidth, look.edge, ParkLeaveShapes.card)
             .semantics { contentDescription = spoken }
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.Start,
+            .padding(ParkLeaveSpace.cardPadding),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(40.dp))
-            Spacer(Modifier.size(12.dp))
-            Text(
-                card.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = foreground,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.height(8.dp))
+        IconTile(look.icon, look.iconTint, look.tileColor)
+        Spacer(Modifier.height(ParkLeaveSpace.x3))
         Text(
-            card.detail,
-            style = MaterialTheme.typography.bodyLarge,
-            color = foreground,
+            card.title.keepWordsTogether(),
+            style = type.cardTitle,
+            color = look.title,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(ParkLeaveSpace.x1))
+        Text(
+            card.detail.keepWordsTogether(),
+            style = type.cardBody,
+            color = look.detail,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (card.guidance.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                card.guidance,
-                style = MaterialTheme.typography.bodyLarge,
-                color = foreground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(ParkLeaveSpace.x3))
+            Spacer(Modifier.weight(1f))
+            ActionHint(card.guidance)
         }
+    }
+}
+
+@Composable
+private fun IconTile(icon: ParkIconKind, tint: Color, container: Color) {
+    Box(
+        modifier = Modifier
+            .size(ParkLeaveDimens.iconTile)
+            .clip(ParkLeaveShapes.tile)
+            .background(container),
+        contentAlignment = Alignment.Center,
+    ) {
+        ParkIcon(icon, tint, Modifier.size(ParkLeaveDimens.icon))
+    }
+}
+
+private const val HINT_ARROW = "hint-arrow"
+
+@Composable
+private fun ActionHint(text: String) {
+    val colors = ParkLeaveTheme.colors
+    val content = buildAnnotatedString {
+        append(text.keepWordsTogether())
+        append("\u00A0")
+        appendInlineContent(HINT_ARROW, "→")
+    }
+    val arrow = mapOf(
+        HINT_ARROW to InlineTextContent(
+            Placeholder(width = 0.9.em, height = 0.9.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
+        ) {
+            ParkIcon(ParkIconKind.ARROW, colors.accent, Modifier.fillMaxSize())
+        },
+    )
+    Text(
+        content,
+        inlineContent = arrow,
+        style = ParkLeaveTheme.type.cardHint,
+        color = colors.accent,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = ParkLeaveTheme.type.sectionLabel,
+        color = ParkLeaveTheme.colors.onSurfaceMuted,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ConfirmedPanel(state: ParkUiState, top: Dp) {
+    val colors = ParkLeaveTheme.colors
+    val note = uncheckedNote(state.report?.uncheckedLines.orEmpty())
+    if (state.confirmed.isEmpty() && note == null) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = top)
+            .clip(ParkLeaveShapes.panel)
+            .background(colors.surface)
+            .border(ParkLeaveDimens.hairline, colors.hairline, ParkLeaveShapes.panel)
+            .padding(ParkLeaveSpace.panelPadding),
+    ) {
+        if (state.confirmed.isNotEmpty()) {
+            SectionLabel("정상으로 확인된 항목")
+            Spacer(Modifier.height(ParkLeaveSpace.x2))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                state.confirmed.forEach { label -> ConfirmedChip(label) }
+            }
+        }
+        if (note != null) {
+            if (state.confirmed.isNotEmpty()) {
+                Spacer(Modifier.height(ParkLeaveSpace.x3))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(ParkLeaveDimens.hairline)
+                        .background(colors.hairline),
+                )
+                Spacer(Modifier.height(ParkLeaveSpace.x3))
+            }
+            UncheckedNote(note)
+        }
+    }
+}
+
+@Composable
+private fun ConfirmedChip(label: String) {
+    val colors = ParkLeaveTheme.colors
+    Row(
+        modifier = Modifier
+            .height(ParkLeaveDimens.chipHeight)
+            .clip(ParkLeaveShapes.pill)
+            .background(colors.surfaceMuted)
+            .semantics { contentDescription = "$label 정상" }
+            .padding(start = 20.dp, end = ParkLeaveSpace.x3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ParkIcon(ParkIconKind.CHECK, colors.ok, Modifier.size(ParkLeaveDimens.chipIcon))
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = ParkLeaveTheme.type.chip, color = colors.onSurface, maxLines = 1)
+    }
+}
+
+@Composable
+private fun UncheckedNote(note: String) {
+    val colors = ParkLeaveTheme.colors
+    val type = ParkLeaveTheme.type
+    val split = note.indexOf(':')
+    val text = buildAnnotatedString {
+        if (split < 0) {
+            append(note)
+        } else {
+            withStyle(type.noteEmphasis.toSpanStyle().copy(color = colors.onSurfaceMuted)) {
+                append(note.substring(0, split + 1))
+            }
+            append(note.substring(split + 1))
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ParkIcon(ParkIconKind.INFO, colors.onSurfaceSubtle, Modifier.size(ParkLeaveDimens.noteIcon))
+        Spacer(Modifier.width(ParkLeaveSpace.x2))
+        Text(
+            text,
+            style = type.note,
+            color = colors.onSurfaceSubtle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 @Composable
 private fun StatusMessage(
     text: String,
-    color: Color,
+    icon: ParkIconKind?,
     modifier: Modifier,
     extra: (@Composable () -> Unit)? = null,
 ) {
+    val colors = ParkLeaveTheme.colors
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = ParkLeaveDimens.headerHeight),
         verticalArrangement = Arrangement.Center,
     ) {
+        if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(ParkLeaveDimens.statusTile)
+                    .clip(ParkLeaveShapes.tileLarge)
+                    .background(colors.accentTint),
+                contentAlignment = Alignment.Center,
+            ) {
+                ParkIcon(icon, colors.accent, Modifier.size(ParkLeaveDimens.statusIcon))
+            }
+            Spacer(Modifier.height(ParkLeaveSpace.x5))
+        }
         Text(
-            text,
-            style = MaterialTheme.typography.displayLarge,
-            color = color,
+            text.keepWordsTogether(),
+            style = ParkLeaveTheme.type.status,
+            color = colors.onSurface,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
         if (extra != null) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(ParkLeaveSpace.x5))
             extra()
         }
     }
@@ -441,27 +607,24 @@ private fun StatusMessage(
 
 @Composable
 private fun ManualCheckButton(onClick: () -> Unit) {
+    val colors = ParkLeaveTheme.colors
     Button(
         onClick = onClick,
         modifier = Modifier
-            .widthIn(min = 280.dp)
-            .heightIn(min = 64.dp),
+            .widthIn(min = ParkLeaveDimens.buttonMinWidth)
+            .heightIn(min = ParkLeaveDimens.buttonHeight),
+        shape = ParkLeaveShapes.pill,
+        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
     ) {
-        Text("지금 점검", style = MaterialTheme.typography.labelLarge)
+        Text("지금 점검", style = ParkLeaveTheme.type.button)
     }
 }
 
-private fun cardColors(tone: CardTone, colors: ParkLeaveColors): Pair<Color, Color> = when (tone) {
-    CardTone.CRITICAL -> colors.critical to colors.onCritical
-    CardTone.WARN -> colors.warn to colors.onWarn
-    CardTone.INFO -> colors.info to colors.onInfo
-}
-
-private fun headlineColor(tone: HeadlineTone, colors: ParkLeaveColors): Color = when (tone) {
+private fun headlineAccent(tone: HeadlineTone, colors: ParkLeaveColors): Color = when (tone) {
     HeadlineTone.NEUTRAL -> colors.onSurface
-    HeadlineTone.CRITICAL -> colors.onCritical
-    HeadlineTone.WARN -> colors.onWarn
-    HeadlineTone.OK -> colors.onOk
+    HeadlineTone.CRITICAL -> colors.critical
+    HeadlineTone.WARN -> colors.warn
+    HeadlineTone.OK -> colors.ok
 }
 
 private fun gearLabel(state: ParkUiState): String {
@@ -469,7 +632,7 @@ private fun gearLabel(state: ParkUiState): String {
     return "$raw ${state.gear.gear.name}"
 }
 
-@Preview(name = "확인 건", widthDp = 1682, heightDp = 900)
+@Preview(name = "확인 건", widthDp = 1682, heightDp = 1200)
 @Composable
 private fun IssuesWidePreview() {
     ParkLeaveTheme(darkTheme = false) {
@@ -477,7 +640,7 @@ private fun IssuesWidePreview() {
     }
 }
 
-@Preview(name = "모두 정상", widthDp = 1682, heightDp = 900)
+@Preview(name = "모두 정상", widthDp = 1682, heightDp = 1200)
 @Composable
 private fun AllClearPreview() {
     ParkLeaveTheme(darkTheme = false) {
@@ -485,7 +648,7 @@ private fun AllClearPreview() {
     }
 }
 
-@Preview(name = "해결 후", widthDp = 1682, heightDp = 900)
+@Preview(name = "해결 후", widthDp = 1682, heightDp = 1200)
 @Composable
 private fun ResolvedPreview() {
     ParkLeaveTheme(darkTheme = false) {
@@ -493,11 +656,19 @@ private fun ResolvedPreview() {
     }
 }
 
-@Preview(name = "야간 확인", widthDp = 1682, heightDp = 900)
+@Preview(name = "야간 확인", widthDp = 1682, heightDp = 1200)
 @Composable
 private fun IssuesNightPreview() {
     ParkLeaveTheme(darkTheme = true) {
         SummaryScreen(previewIssues(), onOpenDebug = {}, onManualCheck = {})
+    }
+}
+
+@Preview(name = "주행 중", widthDp = 1682, heightDp = 1200)
+@Composable
+private fun DrivingPreview() {
+    ParkLeaveTheme(darkTheme = true) {
+        SummaryScreen(previewDriving(), onOpenDebug = {}, onManualCheck = {})
     }
 }
 
@@ -617,7 +788,10 @@ internal fun previewIssues(): ParkUiState {
     )
 }
 
-internal fun previewAllClear(resolved: Boolean): ParkUiState {
+internal fun previewAllClear(
+    resolved: Boolean,
+    uncheckedLines: List<String> = emptyList(),
+): ParkUiState {
     val cards = if (resolved) {
         listOf(
             SummaryCard(SignalId.WINDOW, CardTone.INFO, "창문 열림", "해결됨", resolved = true),
@@ -634,14 +808,24 @@ internal fun previewAllClear(resolved: Boolean): ParkUiState {
             tomorrowLine = null,
             clearanceLine = "내려도 됩니다",
             speechLine = null,
+            uncheckedLines = uncheckedLines,
         ),
         cards = cards,
         confirmed = previewConfirmed(cards),
     )
 }
 
+internal fun previewDriving(): ParkUiState = previewState(
+    report = null,
+    cards = emptyList(),
+    confirmed = emptyList(),
+).copy(
+    gear = GearReading(rawValue = 8, gear = Gear.DRIVE, error = null),
+    session = CheckSession(phase = SessionPhase.FROZEN, motionAllowed = false),
+)
+
 private fun previewState(
-    report: ParkingReport,
+    report: ParkingReport?,
     cards: List<SummaryCard>,
     confirmed: List<String> = previewConfirmed(cards),
 ): ParkUiState {
