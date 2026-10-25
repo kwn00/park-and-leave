@@ -56,7 +56,9 @@ import kotlinx.coroutines.sync.withLock
  * so this app records the failure and does not treat it as an unresolved fault.
  *
  * Tire-pressure registration is the same private permission, so low pressure is
- * read once per scan. `getDoorLockState` Boolean is treated as locked=true.
+ * read once per scan. `setDoorLock` documents true as locked and false as
+ * unlocked, so the Boolean is stored that way. Hood and trunk latch release is
+ * interpreted as an open closure in the check rules, not as a cabin door lock.
  * A null property value is "확인할 수 없음", not off, closed, or empty.
  */
 class PleosSignalSource(

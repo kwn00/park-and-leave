@@ -53,6 +53,7 @@ import io.github.kwn00.parkandleave.domain.headlineTone
 import io.github.kwn00.parkandleave.domain.summaryGridColumns
 import io.github.kwn00.parkandleave.domain.summaryLayout
 import io.github.kwn00.parkandleave.domain.SummaryLayout
+import io.github.kwn00.parkandleave.domain.uncheckedNote
 
 @Composable
 fun SummaryScreen(
@@ -203,25 +204,20 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
 
 @Composable
 private fun UncheckedNote(lines: List<String>) {
-    if (lines.isEmpty()) return
+    val note = uncheckedNote(lines) ?: return
     val colors = LocalParkLeaveColors.current
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        Text(
-            "확인할 수 없는 항목",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.onSurfaceMuted,
-            maxLines = 1,
-        )
-        lines.forEach { line ->
-            Text(
-                line,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceMuted,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    Text(
+        note,
+        modifier = Modifier
+            .padding(top = 16.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.info)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        style = MaterialTheme.typography.bodyLarge,
+        color = colors.onInfo,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
@@ -499,7 +495,10 @@ private fun IssuesNightPreview() {
     }
 }
 
-internal fun previewCardCount(count: Int): ParkUiState {
+internal fun previewCardCount(
+    count: Int,
+    uncheckedLines: List<String> = emptyList(),
+): ParkUiState {
     val prototypes = listOf(
         SummaryCard(SignalId.REAR_OCCUPANCY, CardTone.CRITICAL, "뒷좌석 확인", "2열 왼쪽 점유", resolved = false),
         SummaryCard(SignalId.WINDOW, CardTone.WARN, "창문 열림", "2열 오른쪽 30%", resolved = false),
@@ -515,6 +514,7 @@ internal fun previewCardCount(count: Int): ParkUiState {
             tomorrowLine = null,
             clearanceLine = null,
             speechLine = null,
+            uncheckedLines = uncheckedLines,
         ),
         cards = prototypes.take(count),
     )

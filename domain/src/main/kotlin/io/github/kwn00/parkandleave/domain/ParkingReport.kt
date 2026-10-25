@@ -3,6 +3,7 @@ package io.github.kwn00.parkandleave.domain
 enum class SignalId {
     REAR_OCCUPANCY,
     TRUNK,
+    HOOD,
     DOOR_OPEN,
     TIRE,
     TELLTALE,
@@ -37,7 +38,10 @@ data class ParkingReport(
     val tomorrowLine: String?,
     val clearanceLine: String?,
     val speechLine: String?,
-    /** Calm lines such as "경고등: 이 차량에서 앱이 읽을 수 없음". */
+    /**
+     * Per-source lines such as "경고등: 이 차량에서 앱이 읽을 수 없음".
+     * The summary screen shows [uncheckedNote] instead of this list.
+     */
     val uncheckedLines: List<String> = emptyList(),
 )
 

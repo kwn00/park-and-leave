@@ -114,6 +114,66 @@ class ParkingCheckEvaluatorTest {
     }
 
     @Test
+    fun releasedHoodLatchIsItsOwnOpenCard() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(
+                    DoorReading(VehicleArea.ROW_1_LEFT, position = 0, locked = true),
+                    DoorReading(VehicleArea.HOOD, position = 0, locked = false),
+                ),
+            ),
+        )
+
+        val hood = report.items.single { it.id == SignalId.HOOD }
+        assertEquals("보닛 열림", hood.title)
+        assertEquals(Severity.WARNING, hood.severity)
+        assertTrue(report.items.none { it.id == SignalId.DOOR_UNLOCKED || it.id == SignalId.DOOR_OPEN })
+    }
+
+    @Test
+    fun hoodPositionOpenStaysOffTheDoorCard() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(DoorReading(VehicleArea.HOOD, position = 1, locked = true)),
+            ),
+        )
+
+        assertEquals(listOf(SignalId.HOOD), report.items.map { it.id })
+        assertEquals("보닛 열림", report.items.single().title)
+    }
+
+    @Test
+    fun closedLockedHoodIsClear() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(DoorReading(VehicleArea.HOOD, position = 0, locked = true)),
+            ),
+        )
+
+        assertTrue(report.items.none { it.id == SignalId.HOOD || it.id == SignalId.DOOR_UNLOCKED })
+    }
+
+    @Test
+    fun releasedTrunkLatchIsTrunkOpenNotADoorLock() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(
+                    DoorReading(VehicleArea.ROW_1_LEFT, position = 0, locked = false),
+                    DoorReading(VehicleArea.TRUNK, position = 0, locked = false),
+                    DoorReading(VehicleArea.HOOD, position = 0, locked = false),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(SignalId.TRUNK, SignalId.HOOD, SignalId.DOOR_UNLOCKED),
+            report.items.map { it.id },
+        )
+        assertEquals("트렁크 열림", report.items.first { it.id == SignalId.TRUNK }.title)
+        assertEquals("1열 왼쪽 잠금 해제", report.items.first { it.id == SignalId.DOOR_UNLOCKED }.detail)
+    }
+
+    @Test
     fun cabinExteriorAndHvacFlags() {
         val snapshot = FakePresets.allClear().copy(
             cabinLightOn = true,
@@ -190,6 +250,43 @@ class ParkingCheckEvaluatorTest {
         assertEquals(SignalId.LOW_FUEL, report.items.single().id)
         assertEquals(Severity.CAUTION, report.items.single().severity)
         assertEquals("내일 출발 전 연료를 확인하세요", report.tomorrowLine)
+    }
+
+    @Test
+    fun reportedSocDropsUnreadFuelFromTheCompactNote() {
+        val withSoc = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                socPercent = 70,
+                fuelPercent = null,
+                unread = listOf(
+                    UnreadSignal(SignalSource.WASHER, UnreadCause.NULL_VALUE),
+                    UnreadSignal(SignalSource.TELLTALES, UnreadCause.PERMISSION),
+                    UnreadSignal(SignalSource.FUEL, UnreadCause.NULL_VALUE),
+                    UnreadSignal(SignalSource.TRIP, UnreadCause.NULL_VALUE),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf("워셔액: 확인할 수 없음", "경고등: 이 차량에서 앱이 읽을 수 없음", "주행 거리: 확인할 수 없음"),
+            withSoc.uncheckedLines,
+        )
+        assertEquals(
+            "확인할 수 없는 항목: 워셔액, 경고등, 주행 거리",
+            uncheckedNote(withSoc.uncheckedLines),
+        )
+        assertFalse(withSoc.allClear)
+        assertEquals("확인된 이상 없음", withSoc.headline)
+
+        val withoutSoc = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                socPercent = null,
+                fuelPercent = null,
+                unread = listOf(UnreadSignal(SignalSource.FUEL, UnreadCause.NULL_VALUE)),
+            ),
+        )
+        assertEquals(listOf("연료: 확인할 수 없음"), withoutSoc.uncheckedLines)
+        assertFalse(withoutSoc.allClear)
     }
 
     @Test

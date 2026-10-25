@@ -41,9 +41,22 @@ class SummaryScreenshotTest {
     fun fiveCardsNight() = shoot("summary-five-night", dark = true, count = 5)
 
     private fun shoot(name: String, dark: Boolean, count: Int) {
+        val unchecked = if (count == 2) {
+            listOf(
+                "워셔액: 확인할 수 없음",
+                "경고등: 이 차량에서 앱이 읽을 수 없음",
+                "주행 거리: 확인할 수 없음",
+            )
+        } else {
+            emptyList()
+        }
         paparazzi.snapshot(name = name) {
             ParkLeaveTheme(darkTheme = dark) {
-                SummaryScreen(previewCardCount(count), onOpenDebug = {}, onManualCheck = {})
+                SummaryScreen(
+                    previewCardCount(count, unchecked),
+                    onOpenDebug = {},
+                    onManualCheck = {},
+                )
             }
         }
     }

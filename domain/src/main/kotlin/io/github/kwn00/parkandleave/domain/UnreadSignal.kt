@@ -81,6 +81,17 @@ fun UnreadSignal.blocksClear(): Boolean = when (cause) {
 
 fun UnreadSignal.line(): String = "${source.label()}: ${cause.phrase()}"
 
+/**
+ * One readable info line. Reasons stay on [UnreadSignal.line]; the summary lists names.
+ * Example: "확인할 수 없는 항목: 경고등, 워셔액, 주행 거리".
+ */
+fun uncheckedNote(lines: List<String>): String? {
+    if (lines.isEmpty()) return null
+    val names = lines.map { it.substringBefore(':').trim() }.filter { it.isNotEmpty() }
+    if (names.isEmpty()) return null
+    return "확인할 수 없는 항목: ${names.joinToString(", ")}"
+}
+
 fun SignalSource.label(): String = when (this) {
     SignalSource.VEHICLE_SERVICE -> "차량 서비스"
     SignalSource.WINDOWS -> "창문"
