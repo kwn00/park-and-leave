@@ -103,6 +103,13 @@ data class VehicleSnapshot(
     val tripDistance: Float? = null,
     val readErrors: List<String> = emptyList(),
     val notes: List<String> = emptyList(),
+    val link: SdkLink = SdkLink.CONNECTED,
+    /**
+     * Sources that were attempted and could not be confirmed.
+     * A null field with no entry here means that signal was not part of this reading.
+     * [UnreadCause.NULL_VALUE] means the vehicle returned no value, which is not normal.
+     */
+    val unread: List<UnreadSignal> = emptyList(),
 )
 
 fun VehicleArea.label(): String = when (this) {

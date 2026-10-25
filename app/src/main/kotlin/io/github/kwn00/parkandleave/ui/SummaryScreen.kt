@@ -2,11 +2,11 @@ package io.github.kwn00.parkandleave.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +33,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.kwn00.parkandleave.designsystem.LocalParkLeaveColors
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveColors
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveTheme
@@ -49,6 +51,8 @@ import io.github.kwn00.parkandleave.domain.SummaryCard
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.headlineTone
 import io.github.kwn00.parkandleave.domain.summaryGridColumns
+import io.github.kwn00.parkandleave.domain.summaryLayout
+import io.github.kwn00.parkandleave.domain.SummaryLayout
 
 @Composable
 fun SummaryScreen(
@@ -143,22 +147,40 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
         return
     }
     if (report.allClear && state.cards.isEmpty()) {
-        AllClearHero(report, modifier.fillMaxWidth())
+        Column(modifier, verticalArrangement = Arrangement.Center) {
+            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 520.dp))
+            UncheckedNote(report.uncheckedLines)
+        }
         return
     }
-    val columns = summaryGridColumns(width.value.toInt(), state.cards.size)
-    val singleRow = !report.allClear && state.cards.isNotEmpty() && state.cards.size <= columns
-    if (singleRow) {
+    val layout = summaryLayout(state.cards.size)
+    if (!report.allClear && layout == SummaryLayout.SPOTLIGHT && state.cards.isNotEmpty()) {
         Column(modifier) {
             IssueHeadline(state, report)
+            UncheckedNote(report.uncheckedLines)
             Spacer(Modifier.height(28.dp))
-            CardGrid(state.cards, width, Modifier.weight(1f), expand = true)
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                SpotlightCard(state.cards.first())
+            }
+        }
+        return
+    }
+    if (!report.allClear && layout == SummaryLayout.ROW && state.cards.isNotEmpty()) {
+        Column(modifier) {
+            IssueHeadline(state, report)
+            UncheckedNote(report.uncheckedLines)
+            Spacer(Modifier.height(28.dp))
+            CardRow(state.cards)
         }
         return
     }
     Column(modifier.verticalScroll(rememberScrollState())) {
         if (report.allClear) {
-            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 420.dp))
+            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 420.dp))
+            UncheckedNote(report.uncheckedLines)
             Spacer(Modifier.height(28.dp))
             Text(
                 "해결된 항목",
@@ -167,11 +189,67 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
                 maxLines = 1,
             )
             Spacer(Modifier.height(16.dp))
+            CardGrid(state.cards, width, Modifier.fillMaxWidth())
         } else {
             IssueHeadline(state, report)
-            Spacer(Modifier.height(28.dp))
+            UncheckedNote(report.uncheckedLines)
+            if (state.cards.isNotEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                CardGrid(state.cards, width, Modifier.fillMaxWidth())
+            }
         }
-        CardGrid(state.cards, width, Modifier.fillMaxWidth(), expand = false)
+    }
+}
+
+@Composable
+private fun UncheckedNote(lines: List<String>) {
+    if (lines.isEmpty()) return
+    val colors = LocalParkLeaveColors.current
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Text(
+            "확인할 수 없는 항목",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceMuted,
+            maxLines = 1,
+        )
+        lines.forEach { line ->
+            Text(
+                line,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpotlightCard(card: SummaryCard) {
+    CheckCard(
+        card = card,
+        minHeight = 300.dp,
+        modifier = Modifier.widthIn(max = 760.dp).heightIn(max = 440.dp),
+        iconSize = 88.dp,
+        titleSize = 48.sp,
+        centered = true,
+    )
+}
+
+@Composable
+private fun CardRow(cards: List<SummaryCard>) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        cards.forEach { card ->
+            CheckCard(
+                card = card,
+                minHeight = 220.dp,
+                modifier = Modifier.weight(1f).heightIn(max = 360.dp),
+            )
+        }
     }
 }
 
@@ -258,29 +336,22 @@ private fun CardGrid(
     cards: List<SummaryCard>,
     width: Dp,
     modifier: Modifier = Modifier,
-    expand: Boolean = false,
 ) {
     if (cards.isEmpty()) return
-    val columns = summaryGridColumns(width.value.toInt(), cards.size)
-    val minHeight = if (expand) 280.dp else 168.dp
+    val columns = summaryGridColumns(width.value.toInt(), cards.size).coerceAtLeast(1)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(20.dp)) {
         for (row in cards.chunked(columns)) {
-            val rowModifier = if (expand) {
-                Modifier.fillMaxWidth().weight(1f)
-            } else {
-                Modifier.fillMaxWidth()
-            }
             Row(
-                modifier = rowModifier,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.Top,
             ) {
                 for (card in row) {
-                    val cardModifier = if (expand) {
-                        Modifier.weight(1f).fillMaxHeight()
-                    } else {
-                        Modifier.weight(1f)
-                    }
-                    CheckCard(card, minHeight, cardModifier)
+                    CheckCard(
+                        card = card,
+                        minHeight = 168.dp,
+                        modifier = Modifier.weight(1f).heightIn(max = 280.dp),
+                    )
                 }
                 var blanks = columns - row.size
                 while (blanks > 0) {
@@ -293,9 +364,20 @@ private fun CardGrid(
 }
 
 @Composable
-private fun CheckCard(card: SummaryCard, minHeight: Dp, modifier: Modifier) {
+private fun CheckCard(
+    card: SummaryCard,
+    minHeight: Dp,
+    modifier: Modifier,
+    iconSize: Dp = 48.dp,
+    titleSize: TextUnit = 32.sp,
+    centered: Boolean = false,
+) {
     val colors = LocalParkLeaveColors.current
     val (background, foreground) = cardColors(card.tone, colors)
+    val titleStyle = MaterialTheme.typography.titleLarge.copy(
+        fontSize = titleSize,
+        lineHeight = if (centered) 56.sp else 40.sp,
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -305,24 +387,26 @@ private fun CheckCard(card: SummaryCard, minHeight: Dp, modifier: Modifier) {
             .semantics { contentDescription = "${card.title}. ${card.detail}" }
             .padding(horizontal = 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(48.dp))
+            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(iconSize))
             Spacer(Modifier.size(16.dp))
             Text(
                 card.title,
-                style = MaterialTheme.typography.titleLarge,
+                style = titleStyle,
                 color = foreground,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.height(12.dp))
         Text(
             card.detail,
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (centered) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.bodyLarge,
             color = foreground,
-            maxLines = 1,
+            textAlign = if (centered) TextAlign.Center else TextAlign.Start,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -413,6 +497,27 @@ private fun IssuesNightPreview() {
     ParkLeaveTheme(darkTheme = true) {
         SummaryScreen(previewIssues(), onOpenDebug = {}, onManualCheck = {})
     }
+}
+
+internal fun previewCardCount(count: Int): ParkUiState {
+    val prototypes = listOf(
+        SummaryCard(SignalId.REAR_OCCUPANCY, CardTone.CRITICAL, "뒷좌석 확인", "2열 왼쪽 점유", resolved = false),
+        SummaryCard(SignalId.WINDOW, CardTone.WARN, "창문 열림", "2열 오른쪽 30%", resolved = false),
+        SummaryCard(SignalId.HVAC, CardTone.WARN, "공조 켜짐", "공조가 켜져 있습니다", resolved = false),
+        SummaryCard(SignalId.EXTERIOR_LIGHT, CardTone.WARN, "외부등 켜짐", "미등 켜짐", resolved = false),
+        SummaryCard(SignalId.DOOR_UNLOCKED, CardTone.WARN, "도어 잠금 해제", "1열 왼쪽 잠금 해제", resolved = false),
+    )
+    return previewState(
+        report = ParkingReport(
+            items = emptyList(),
+            headline = "확인 ${count}건",
+            allClear = false,
+            tomorrowLine = null,
+            clearanceLine = null,
+            speechLine = null,
+        ),
+        cards = prototypes.take(count),
+    )
 }
 
 internal fun previewIssues(): ParkUiState {

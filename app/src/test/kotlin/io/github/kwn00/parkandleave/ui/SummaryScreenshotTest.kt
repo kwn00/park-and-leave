@@ -23,21 +23,27 @@ class SummaryScreenshotTest {
     )
 
     @Test
-    fun issuesDay() = shoot("summary-issues-day", dark = false, state = previewIssues())
+    fun oneCardDay() = shoot("summary-one-day", dark = false, count = 1)
 
     @Test
-    fun allClearDay() = shoot("summary-all-clear-day", dark = false, state = previewAllClear(resolved = false))
+    fun oneCardNight() = shoot("summary-one-night", dark = true, count = 1)
 
     @Test
-    fun resolvedDay() = shoot("summary-resolved-day", dark = false, state = previewAllClear(resolved = true))
+    fun twoCardsDay() = shoot("summary-two-day", dark = false, count = 2)
 
     @Test
-    fun issuesNight() = shoot("summary-issues-night", dark = true, state = previewIssues())
+    fun twoCardsNight() = shoot("summary-two-night", dark = true, count = 2)
 
-    private fun shoot(name: String, dark: Boolean, state: ParkUiState) {
+    @Test
+    fun fiveCardsDay() = shoot("summary-five-day", dark = false, count = 5)
+
+    @Test
+    fun fiveCardsNight() = shoot("summary-five-night", dark = true, count = 5)
+
+    private fun shoot(name: String, dark: Boolean, count: Int) {
         paparazzi.snapshot(name = name) {
             ParkLeaveTheme(darkTheme = dark) {
-                SummaryScreen(state, onOpenDebug = {}, onManualCheck = {})
+                SummaryScreen(previewCardCount(count), onOpenDebug = {}, onManualCheck = {})
             }
         }
     }

@@ -1,8 +1,39 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("app.cash.paparazzi") version "1.3.5"
+}
+
+/**
+ * Contest release signing. Values come from the environment, or from a Gradle
+ * property. Gradle loads `~/.gradle/gradle.properties` as project properties,
+ * so a secret kept there is visible to [findProperty] and is not committed.
+ * Missing values keep `assembleRelease` working with the debug keystore.
+ */
+fun signingSecret(name: String): String? {
+    System.getenv(name)?.takeIf { it.isNotBlank() }?.let { return it }
+    return (findProperty(name) as? String)?.takeIf { it.isNotBlank() }
+}
+
+val releaseStorePath = signingSecret("PARK_LEAVE_STORE_FILE")
+val releaseStoreFile = releaseStorePath?.let { File(it) }?.takeIf { it.isFile }
+val releaseStorePassword = signingSecret("PARK_LEAVE_STORE_PASSWORD")
+val releaseKeyAlias = signingSecret("PARK_LEAVE_KEY_ALIAS")
+val releaseKeyPassword = signingSecret("PARK_LEAVE_KEY_PASSWORD")
+val useReleaseKeystore = releaseStoreFile != null &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
+if (useReleaseKeystore) {
+    logger.lifecycle("Release signing: contest keystore")
+} else if (releaseStorePath != null && releaseStoreFile == null) {
+    logger.lifecycle("Release signing: PARK_LEAVE_STORE_FILE is set but the file is missing. Using the debug keystore.")
+} else {
+    logger.lifecycle("Release signing: debug keystore fallback. Set PARK_LEAVE_STORE_FILE, PARK_LEAVE_STORE_PASSWORD, PARK_LEAVE_KEY_ALIAS, and PARK_LEAVE_KEY_PASSWORD to sign the contest APK.")
 }
 
 android {
@@ -18,10 +49,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (useReleaseKeystore) {
+            create("contest") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword.orEmpty()
+                keyAlias = releaseKeyAlias.orEmpty()
+                keyPassword = releaseKeyPassword.orEmpty()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (useReleaseKeystore) {
+                signingConfigs.getByName("contest")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

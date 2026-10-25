@@ -26,10 +26,13 @@ class ParkingCheckEvaluator {
             addMappedTelltales(snapshot)
         }.sortedWith(compareBy<CheckItem> { it.severity.ordinal }.thenBy { it.id.ordinal })
 
-        val allClear = items.isEmpty() && snapshot.readErrors.isEmpty()
+        val unread = visibleUnread(snapshot)
+        val blocked = unread.any { it.blocksClear() } ||
+            (snapshot.unread.isEmpty() && snapshot.link == SdkLink.CONNECTED && snapshot.readErrors.isNotEmpty())
+        val allClear = items.isEmpty() && !blocked
         val headline = when {
             items.isNotEmpty() -> "확인 ${items.size}건"
-            snapshot.readErrors.isNotEmpty() -> "확인된 이상 없음"
+            !allClear -> "확인된 이상 없음"
             else -> "모두 정상"
         }
         return ParkingReport(
@@ -39,6 +42,7 @@ class ParkingCheckEvaluator {
             tomorrowLine = tomorrowLine(snapshot, items),
             clearanceLine = if (allClear) "내려도 됩니다" else null,
             speechLine = speechLine(items),
+            uncheckedLines = unread.map { it.line() },
         )
     }
 
@@ -198,6 +202,19 @@ class ParkingCheckEvaluator {
             )
         }
     }
+}
+
+/**
+ * A disconnected service is one unchecked line. Structured [VehicleSnapshot.unread]
+ * entries are the source of truth. Legacy [VehicleSnapshot.readErrors] strings
+ * still block "모두 정상" only when no structured entry explains them.
+ */
+private fun visibleUnread(snapshot: VehicleSnapshot): List<UnreadSignal> {
+    val recorded = snapshot.unread.distinctBy { it.source }.toMutableList()
+    if (snapshot.link != SdkLink.CONNECTED && recorded.none { it.source == SignalSource.VEHICLE_SERVICE }) {
+        recorded += UnreadSignal(SignalSource.VEHICLE_SERVICE, UnreadCause.DISCONNECTED)
+    }
+    return recorded.sortedBy { it.source.ordinal }
 }
 
 private fun item(

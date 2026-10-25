@@ -37,6 +37,8 @@ data class ParkingReport(
     val tomorrowLine: String?,
     val clearanceLine: String?,
     val speechLine: String?,
+    /** Calm lines such as "경고등: 이 차량에서 앱이 읽을 수 없음". */
+    val uncheckedLines: List<String> = emptyList(),
 )
 
 enum class SessionPhase {

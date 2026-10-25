@@ -12,6 +12,10 @@ fun formatDebugRows(
     rows += DebugRow("gear", gear.gear.name)
     rows += DebugRow("gear.error", gear.error ?: "-")
     rows += DebugRow("snapshot.ready", snapshot.ready.toString())
+    rows += DebugRow("sdk", snapshot.link.name)
+    snapshot.unread.forEach { unread ->
+        rows += DebugRow("unread.${unread.source.name}", unread.line())
+    }
     snapshot.windows.forEach { window ->
         rows += DebugRow(
             "window.${window.area.name}",

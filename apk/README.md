@@ -1,17 +1,23 @@
-# APK 제출 위치
+# 제출용 APK
 
-실행 가능한 release APK는 이 폴더에 다음 이름으로 둡니다.
-
-```text
-apk/<팀명>_ParkAndLeave_release.apk
-```
-
-팀명은 접수 팀 이름을 그대로 쓰고, 앱 이름은 `ParkAndLeave`로 고정합니다. 예시는 패턴만 보여 주기 위한 것이며, 이 저장소에는 아직 그 이름의 APK를 커밋하지 않습니다.
-
-로컬 release 빌드 파일은 다음 경로에 생성됩니다.
+제출물은 소스와 실행 가능한 release APK를 함께 둡니다. 서명된 APK는 이 폴더에 다음 이름으로 둡니다.
 
 ```text
-app/build/outputs/apk/release/app-release.apk
+apk/ParkAndLeave_release.apk
 ```
 
-이 빌드는 현재 디버그 키스토어로 서명되어 있습니다. 제출 전에 위 파일명의 복사본을 이 폴더에 넣으면 됩니다.
+키스토어 파일과 비밀번호는 저장소에 넣지 않습니다. `*.jks`와 `*.keystore`는 `.gitignore`에 있습니다. 서명 값은 환경 변수이거나 `~/.gradle/gradle.properties`의 Gradle 속성입니다.
+
+| 이름 | 의미 |
+|---|---|
+| `PARK_LEAVE_STORE_FILE` | 키스토어 파일 경로 |
+| `PARK_LEAVE_STORE_PASSWORD` | 키스토어 비밀번호 |
+| `PARK_LEAVE_KEY_ALIAS` | 키 별칭 |
+| `PARK_LEAVE_KEY_PASSWORD` | 키 비밀번호 |
+
+네 값이 모두 있고 파일이 있으면 `assembleRelease`가 그 키스토어로 서명합니다. 하나라도 없으면 빌드는 실패하지 않고 디버그 키스토어로 서명합니다. 그 APK도 에뮬레이터에 설치할 수 있습니다. 이 폴더의 `ParkAndLeave_release.apk`는 키스토어 변수가 없을 때 만든 그 서명본입니다. 콘테스트 키가 있으면 같은 이름으로 바꾸면 됩니다.
+
+```bash
+./gradlew assembleRelease
+cp app/build/outputs/apk/release/app-release.apk apk/ParkAndLeave_release.apk
+```
