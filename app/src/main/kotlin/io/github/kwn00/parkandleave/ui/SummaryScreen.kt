@@ -256,7 +256,9 @@ private fun IssueHeadline(state: ParkUiState, report: ParkingReport, density: Su
                 modifier = Modifier
                     .weight(1f)
                     .alignBy(LastBaseline),
-                verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.half),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (density.compactHeadline) 2.dp else ParkLeaveSpace.half,
+                ),
             ) {
                 context.forEach { (line, color) ->
                     BoxedText(line.keepWordsTogether(), style = type.subline, color = color)
@@ -274,6 +276,26 @@ private fun BoxedText(
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
 ) = BoxedText(AnnotatedString(text), style, color, modifier, maxLines)
+
+/**
+ * Card text keeps the font's measured height. Hangul draws at about 1.45 em even when
+ * [TextStyle.lineHeight] is smaller, and [lineBox] would push those glyphs into the card clip.
+ */
+@Composable
+private fun CardLine(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    maxLines: Int = 1,
+) {
+    Text(
+        text,
+        style = style,
+        color = color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
 
 /** Summary text measured at its token line height; see [lineBox]. */
 @Composable
@@ -436,7 +458,7 @@ private fun cardLook(card: SummaryCard, colors: ParkLeaveColors): CardLook {
 }
 
 @Composable
-private fun CheckCard(card: SummaryCard, density: SummaryDensity, modifier: Modifier) {
+internal fun CheckCard(card: SummaryCard, density: SummaryDensity, modifier: Modifier) {
     val colors = ParkLeaveTheme.colors
     val type = ParkLeaveTheme.type
     val look = cardLook(card, colors)
@@ -445,7 +467,11 @@ private fun CheckCard(card: SummaryCard, density: SummaryDensity, modifier: Modi
     } else {
         "${card.title}. ${card.detail}"
     }
-    val titleStyle = if (density.compactTitle) type.cardTitleCompact else type.cardTitle
+    val titleStyle = when {
+        density.denseTitle -> type.cardTitleDense
+        density.compactTitle -> type.cardTitleCompact
+        else -> type.cardTitle
+    }
     Column(
         modifier = modifier
             .clip(ParkLeaveShapes.card)
@@ -458,18 +484,18 @@ private fun CheckCard(card: SummaryCard, density: SummaryDensity, modifier: Modi
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconTile(look.icon, look.iconTint, look.tileColor, density)
                 Spacer(Modifier.width(density.tileGap))
-                BoxedText(card.title.keepWordsTogether(), style = titleStyle, color = look.title)
+                CardLine(card.title.keepWordsTogether(), titleStyle, look.title)
             }
         } else {
             IconTile(look.icon, look.iconTint, look.tileColor, density)
             Spacer(Modifier.height(density.tileGap))
-            BoxedText(card.title.keepWordsTogether(), style = titleStyle, color = look.title, maxLines = 2)
+            CardLine(card.title.keepWordsTogether(), titleStyle, look.title, maxLines = 2)
         }
         Spacer(Modifier.height(density.titleGap))
-        BoxedText(
+        CardLine(
             card.detail.keepPhrasesTogether(),
-            style = type.cardBody.copy(lineHeight = density.bodyLineHeight),
-            color = look.detail,
+            type.cardBody.copy(lineHeight = density.bodyLineHeight),
+            look.detail,
             maxLines = 2,
         )
         if (card.guidance.isNotBlank()) {
@@ -522,10 +548,10 @@ private fun ActionHint(text: String, density: SummaryDensity) {
                 .background(colors.hairline),
         )
         Spacer(Modifier.height(density.hintGap))
-        BoxedText(
+        CardLine(
             text.keepWordsTogether(),
-            style = ParkLeaveTheme.type.cardHint.copy(lineHeight = density.hintLineHeight),
-            color = colors.onSurface,
+            ParkLeaveTheme.type.cardHint.copy(lineHeight = density.hintLineHeight),
+            colors.onSurface,
         )
     }
 }

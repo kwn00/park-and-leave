@@ -64,14 +64,17 @@ class CardTextFitTest {
                 val type = ParkLeaveTheme.type
                 val px = LocalDensity.current
                 val width = with(px) { cardTextWidth(content, COLUMNS, SummaryDensity.Regular).toPx().toInt() }
-                val besideTile = with(px) { cardTitleWidth(content, COLUMNS, SummaryDensity.Dense).toPx().toInt() }
+                val compactTitleWidth = with(px) { cardTitleWidth(content, COLUMNS, SummaryDensity.Compact).toPx().toInt() }
+                val denseTitleWidth = with(px) { cardTitleWidth(content, COLUMNS, SummaryDensity.Dense).toPx().toInt() }
                 cards.forEach { card ->
                     val title = AnnotatedString(card.title.keepWordsTogether())
                     measured[card] = CardLines(
                         width = width,
-                        titleWidth = besideTile,
+                        titleWidth = compactTitleWidth,
+                        denseTitleWidth = denseTitleWidth,
                         title = measurer.lines(title, type.cardTitle, width),
-                        compactTitle = measurer.lines(title, type.cardTitleCompact, besideTile),
+                        compactTitle = measurer.lines(title, type.cardTitleCompact, compactTitleWidth),
+                        denseTitle = measurer.lines(title, type.cardTitleDense, denseTitleWidth),
                         body = measurer.lines(AnnotatedString(card.detail.keepPhrasesTogether()), type.cardBody, width),
                         hint = measurer.lines(AnnotatedString(card.guidance.keepWordsTogether()), type.cardHint, width),
                     )
@@ -93,6 +96,9 @@ class CardTextFitTest {
                 if (lines.compactTitle.count != 1) {
                     add("title beside tile '${card.title}' ${lines.compactTitle.describe(lines.titleWidth)}")
                 }
+                if (lines.denseTitle.count != 1) {
+                    add("dense title '${card.title}' ${lines.denseTitle.describe(lines.denseTitleWidth)}")
+                }
                 if (lines.body.count > maxBodyLines) add("body '${card.detail}' ${lines.body.describe(lines.width)}")
                 if (lines.hint.count != 1) add("hint '${card.guidance}' ${lines.hint.describe(lines.width)}")
             }
@@ -107,8 +113,10 @@ class CardTextFitTest {
     private data class CardLines(
         val width: Int,
         val titleWidth: Int,
+        val denseTitleWidth: Int,
         val title: Measured,
         val compactTitle: Measured,
+        val denseTitle: Measured,
         val body: Measured,
         val hint: Measured,
     )

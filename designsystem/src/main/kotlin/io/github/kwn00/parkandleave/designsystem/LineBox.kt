@@ -12,8 +12,10 @@ import kotlin.math.roundToInt
  * and the last line's bottom out to that font's 1.45 em extent so no glyph can clip. That
  * padding is empty space above and below the glyphs, about 14 dp on a 48 sp title. This
  * trims it evenly from both ends so spacing tokens measure the gap between line boxes.
- * Glyphs still draw in full; only the reported bounds shrink. A block that is already no
- * taller than its line boxes, such as Latin-only text, is left as it is.
+ * Glyphs still draw in full; only the reported bounds shrink, and the draw extends past
+ * the reported box. Do not use this inside a clipped card: Hangul fills that extension,
+ * and the clip cuts the bottoms off. A block already no taller than its line boxes,
+ * such as Latin-only text, is left as it is.
  */
 fun Modifier.lineBox(lineHeight: TextUnit): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
