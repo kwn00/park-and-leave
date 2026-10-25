@@ -514,4 +514,30 @@ class ParkingCheckEvaluatorTest {
         assertEquals(2, evaluator.evaluate(open).items.size)
         assertEquals(listOf(SignalId.READING_LIGHT), evaluator.evaluate(closed).items.map { it.id })
     }
+
+    @Test
+    fun manyPlacesCollapseToAShortDetailAndKeepGuidance() {
+        val lights = FakePresets.allClear().copy(
+            readingLights = listOf(
+                ReadingLightReading(VehicleArea.ROW_1_LEFT, on = true),
+                ReadingLightReading(VehicleArea.ROW_1_RIGHT, on = true),
+                ReadingLightReading(VehicleArea.ROW_2_LEFT, on = true),
+                ReadingLightReading(VehicleArea.ROW_2_RIGHT, on = true),
+            ),
+        )
+        val reading = evaluator.evaluate(lights).items.single { it.id == SignalId.READING_LIGHT }
+        assertEquals("1열·2열 양쪽", reading.detail)
+        assertEquals("독서등을 꺼 주세요", reading.guidance)
+
+        val seats = FakePresets.allClear().copy(
+            seats = listOf(
+                SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED),
+                SeatReading(VehicleArea.ROW_2_CENTER, SeatOccupancy.OCCUPIED),
+                SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.OCCUPIED),
+            ),
+        )
+        val rear = evaluator.evaluate(seats).items.single { it.id == SignalId.REAR_OCCUPANCY }
+        assertEquals("2열 전체 점유", rear.detail)
+        assertEquals("뒷좌석을 확인하세요", rear.guidance)
+    }
 }

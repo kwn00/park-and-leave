@@ -9,13 +9,12 @@ class SummaryBoardTest {
     private val evaluator = ParkingCheckEvaluator()
 
     @Test
-    fun oneCardIsHeroTwoArePairAndThreeOrMoreAreGrid() {
-        assertEquals(SummaryLayout.HERO, summaryLayout(0))
-        assertEquals(SummaryLayout.HERO, summaryLayout(1))
-        assertEquals(SummaryLayout.PAIR, summaryLayout(2))
-        assertEquals(SummaryLayout.GRID, summaryLayout(3))
-        assertEquals(SummaryLayout.GRID, summaryLayout(4))
-        assertEquals(SummaryLayout.GRID, summaryLayout(5))
+    fun fewCardsKeepTheSameSlotAsAFullRow() {
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 1))
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 2))
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 5))
+        assertEquals(3, summaryGridColumns(widthDp = 1200, cardCount = 2))
+        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 0))
     }
 
     @Test
@@ -25,11 +24,9 @@ class SummaryBoardTest {
     }
 
     @Test
-    fun fewerCardsStillSpanTheRow() {
-        assertEquals(2, summaryGridColumns(widthDp = 1682, cardCount = 2))
-        assertEquals(3, summaryGridColumns(widthDp = 1200, cardCount = 3))
-        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 1))
-        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 0))
+    fun narrowerWindowsDropAColumnEvenForOneCard() {
+        assertEquals(2, summaryGridColumns(widthDp = 1079, cardCount = 1))
+        assertEquals(1, summaryGridColumns(widthDp = 719, cardCount = 3))
     }
 
     @Test

@@ -2,13 +2,13 @@ package io.github.kwn00.parkandleave.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,8 +53,6 @@ import io.github.kwn00.parkandleave.domain.SummaryCard
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.headlineTone
 import io.github.kwn00.parkandleave.domain.summaryGridColumns
-import io.github.kwn00.parkandleave.domain.summaryLayout
-import io.github.kwn00.parkandleave.domain.SummaryLayout
 import io.github.kwn00.parkandleave.domain.uncheckedNote
 
 @Composable
@@ -148,15 +147,10 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
         StatusMessage("점검 중", colors.onSurface, modifier)
         return
     }
-    if (report.allClear && state.cards.isEmpty()) {
-        Column(modifier) {
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        if (report.allClear && state.cards.isEmpty()) {
             AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 400.dp))
-            ConfirmedSection(state, Modifier.weight(1f).fillMaxWidth())
-        }
-        return
-    }
-    if (report.allClear) {
-        Column(modifier.verticalScroll(rememberScrollState())) {
+        } else if (report.allClear) {
             AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 360.dp))
             Spacer(Modifier.height(28.dp))
             Text(
@@ -167,33 +161,14 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
             )
             Spacer(Modifier.height(16.dp))
             CardGrid(state.cards, width, Modifier.fillMaxWidth())
-            ConfirmedSection(state, Modifier.fillMaxWidth())
-        }
-        return
-    }
-    when (summaryLayout(state.cards.size)) {
-        SummaryLayout.HERO -> Column(modifier) {
-            IssueHeadline(state, report)
-            if (state.cards.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                HeroCard(state.cards.first())
-            }
-            ConfirmedSection(state, Modifier.weight(1f).fillMaxWidth())
-        }
-        SummaryLayout.PAIR -> Column(modifier) {
-            IssueHeadline(state, report)
-            Spacer(Modifier.height(20.dp))
-            PairRow(state.cards)
-            ConfirmedSection(state, Modifier.weight(1f).fillMaxWidth())
-        }
-        SummaryLayout.GRID -> Column(modifier) {
+        } else {
             IssueHeadline(state, report)
             if (state.cards.isNotEmpty()) {
                 Spacer(Modifier.height(20.dp))
                 CardGrid(state.cards, width, Modifier.fillMaxWidth())
             }
-            ConfirmedSection(state, Modifier.weight(1f).fillMaxWidth())
         }
+        ConfirmedSection(state, Modifier.fillMaxWidth())
     }
 }
 
@@ -273,41 +248,6 @@ private fun UncheckedNote(lines: List<String>) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
-}
-
-@Composable
-private fun HeroCard(card: SummaryCard) {
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        CheckCard(
-            card = card,
-            minHeight = 320.dp,
-            modifier = Modifier.fillMaxWidth(0.76f),
-            iconSize = 64.dp,
-            padding = 28.dp,
-            showGuidance = true,
-            largeType = true,
-        )
-    }
-}
-
-@Composable
-private fun PairRow(cards: List<SummaryCard>) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(320.dp),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        cards.forEach { card ->
-            CheckCard(
-                card = card,
-                minHeight = 320.dp,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                iconSize = 64.dp,
-                padding = 28.dp,
-                showGuidance = true,
-                largeType = true,
-            )
-        }
-    }
 }
 
 @Composable
@@ -396,75 +336,64 @@ private fun CardGrid(
 ) {
     if (cards.isEmpty()) return
     val columns = summaryGridColumns(width.value.toInt(), cards.size).coerceAtLeast(1)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    val gap = 20.dp
+    val cardWidth = ((width - gap * (columns - 1)) / columns).coerceAtLeast(0.dp)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
         for (row in cards.chunked(columns)) {
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.Top,
             ) {
                 for (card in row) {
                     CheckCard(
                         card = card,
-                        minHeight = 168.dp,
-                        modifier = Modifier.weight(1f).heightIn(max = 280.dp),
+                        minHeight = CardHeight,
+                        modifier = Modifier.width(cardWidth).fillMaxHeight(),
                     )
-                }
-                var blanks = columns - row.size
-                while (blanks > 0) {
-                    Spacer(Modifier.weight(1f))
-                    blanks -= 1
                 }
             }
         }
     }
 }
 
+private val CardHeight = 208.dp
+
 @Composable
 private fun CheckCard(
     card: SummaryCard,
     minHeight: Dp,
     modifier: Modifier,
-    iconSize: Dp = 48.dp,
-    padding: Dp = 24.dp,
-    showGuidance: Boolean = false,
-    largeType: Boolean = false,
 ) {
     val colors = LocalParkLeaveColors.current
     val (background, foreground) = cardColors(card.tone, colors)
-    val titleStyle = if (largeType) {
-        MaterialTheme.typography.headlineMedium
-    } else {
-        MaterialTheme.typography.titleLarge
-    }
-    val spoken = if (showGuidance && card.guidance.isNotBlank()) {
+    val spoken = if (card.guidance.isNotBlank()) {
         "${card.title}. ${card.detail}. ${card.guidance}"
     } else {
         "${card.title}. ${card.detail}"
     }
     Column(
         modifier = modifier
-            .fillMaxWidth()
             .heightIn(min = minHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(background)
             .semantics { contentDescription = spoken }
-            .padding(padding),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.Start,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(iconSize))
-            Spacer(Modifier.size(16.dp))
+            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(40.dp))
+            Spacer(Modifier.size(12.dp))
             Text(
                 card.title,
-                style = titleStyle,
+                style = MaterialTheme.typography.titleLarge,
                 color = foreground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             card.detail,
             style = MaterialTheme.typography.bodyLarge,
@@ -472,8 +401,8 @@ private fun CheckCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (showGuidance && card.guidance.isNotBlank()) {
-            Spacer(Modifier.height(16.dp))
+        if (card.guidance.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
             Text(
                 card.guidance,
                 style = MaterialTheme.typography.bodyLarge,
@@ -588,7 +517,7 @@ internal fun previewCardCount(
         SignalId.REAR_OCCUPANCY,
         CardTone.CRITICAL,
         "뒷좌석 확인",
-        "2열 왼쪽 · 2열 오른쪽 · 2열 가운데 점유",
+        "2열 전체 점유",
         resolved = false,
         guidance = "뒷좌석을 확인하세요",
     )
@@ -619,12 +548,12 @@ internal fun previewCardCount(
             guidance = "전조등·미등을 꺼 주세요",
         ),
         SummaryCard(
-            SignalId.DOOR_UNLOCKED,
+            SignalId.READING_LIGHT,
             CardTone.WARN,
-            "도어 잠금 해제",
-            "1열 왼쪽 잠금 해제",
+            "독서등 켜짐",
+            "1열·2열 양쪽",
             resolved = false,
-            guidance = "도어 잠금 버튼을 눌러 주세요",
+            guidance = "독서등을 꺼 주세요",
         ),
     )
     val cards = when (count) {

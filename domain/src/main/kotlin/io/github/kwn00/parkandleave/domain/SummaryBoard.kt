@@ -25,7 +25,7 @@ data class SummaryCard(
     val title: String,
     val detail: String,
     val resolved: Boolean,
-    /** One-line action for the hero and pair layouts. Empty when the card is resolved. */
+    /** One-line action. Empty when the card is resolved. */
     val guidance: String = "",
 )
 
@@ -36,38 +36,18 @@ fun Severity.toCardTone(): CardTone = when (this) {
     Severity.CAUTION -> CardTone.WARN
 }
 
-enum class SummaryLayout {
-    /** One card, wide and centered. */
-    HERO,
-
-    /** Two equal cards side by side. */
-    PAIR,
-
-    /** Three or more cards, up to four columns. */
-    GRID,
-}
-
-/** 1 card is a hero, 2 cards are a pair, and 3 or more use the column grid. */
-fun summaryLayout(cardCount: Int): SummaryLayout = when {
-    cardCount <= 1 -> SummaryLayout.HERO
-    cardCount == 2 -> SummaryLayout.PAIR
-    else -> SummaryLayout.GRID
-}
-
 /**
- * How many equal columns the summary grid should use for this window.
- * Used when [summaryLayout] is [SummaryLayout.GRID]. Fewer cards than the fit
- * still share the row horizontally. Cards do not grow to the screen height.
+ * How many columns a row can hold. The count does not shrink the slot:
+ * one card stays the same width as a card in a full row and aligns left.
  */
 fun summaryGridColumns(widthDp: Int, cardCount: Int): Int {
-    if (cardCount <= 1) return 1
-    val fit = when {
+    if (cardCount <= 0) return 1
+    return when {
         widthDp >= 1500 -> 4
         widthDp >= 1080 -> 3
         widthDp >= 720 -> 2
         else -> 1
     }
-    return minOf(fit, cardCount)
 }
 
 fun rememberSeen(previous: List<SeenIssue>, items: List<CheckItem>): List<SeenIssue> {
