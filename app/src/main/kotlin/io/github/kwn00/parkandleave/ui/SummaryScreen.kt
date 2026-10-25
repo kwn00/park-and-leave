@@ -190,7 +190,7 @@ private fun GearPill(state: ParkUiState) {
 
 /**
  * The summary never scrolls. Content keeps its natural height, top-aligned, and
- * [SummaryDensity] is chosen so that height stays inside the pane for up to fourteen cards.
+ * [SummaryDensity] is chosen so that height stays inside the pane for up to thirteen cards.
  */
 @Composable
 private fun ColumnScope.ActiveSummary(state: ParkUiState, width: Dp, density: SummaryDensity) {
@@ -773,16 +773,16 @@ internal fun previewCardCount(
         resolved = false,
         guidance = "보닛을 닫아 주세요",
     )
-    val rear = SummaryCard(
-        SignalId.REAR_OCCUPANCY,
+    val trunk = SummaryCard(
+        SignalId.TRUNK,
         CardTone.CRITICAL,
-        "뒷좌석 확인",
-        "2열 전체 점유",
+        "트렁크 열림",
+        "트렁크가 열려 있습니다",
         resolved = false,
-        guidance = "뒷좌석을 확인하세요",
+        guidance = "트렁크를 닫아 주세요",
     )
     val more = listOf(
-        rear,
+        trunk,
         SummaryCard(
             SignalId.WINDOW,
             CardTone.WARN,
@@ -818,7 +818,7 @@ internal fun previewCardCount(
     )
     val cards = when (count) {
         1 -> listOf(hood)
-        2 -> listOf(rear, hood)
+        2 -> listOf(trunk, hood)
         else -> more.take(count)
     }
     return previewState(
@@ -847,7 +847,6 @@ private fun previewConfirmed(cards: List<SummaryCard>): List<String> {
         SignalId.CABIN_LIGHT to "실내등",
         SignalId.READING_LIGHT to "독서등",
         SignalId.EXTERIOR_LIGHT to "외부등",
-        SignalId.REAR_OCCUPANCY to "뒷좌석",
         SignalId.HVAC to "공조",
         SignalId.TIRE to "타이어",
         SignalId.LOW_SOC to "배터리",
@@ -858,7 +857,6 @@ private fun previewConfirmed(cards: List<SummaryCard>): List<String> {
 
 internal fun previewIssues(): ParkUiState {
     val cards = listOf(
-        SummaryCard(SignalId.REAR_OCCUPANCY, CardTone.CRITICAL, "뒷좌석 점유", "2열 왼쪽 탑승", resolved = false),
         SummaryCard(SignalId.EXTERIOR_LIGHT, CardTone.WARN, "외부등", "미등 켜짐", resolved = false),
         SummaryCard(SignalId.HVAC, CardTone.WARN, "공조", "켜짐", resolved = false),
         SummaryCard(SignalId.WINDOW, CardTone.INFO, "창문 열림", "해결됨", resolved = true),
@@ -866,7 +864,7 @@ internal fun previewIssues(): ParkUiState {
     return previewState(
         report = ParkingReport(
             items = emptyList(),
-            headline = "확인 3건",
+            headline = "확인 2건",
             allClear = false,
             tomorrowLine = null,
             clearanceLine = null,

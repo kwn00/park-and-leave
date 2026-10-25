@@ -3,7 +3,7 @@ package io.github.kwn00.parkandleave.domain
 enum class FakePreset {
     ALL_CLEAR,
     WINDOW_AND_READING,
-    REAR_SEAT_AND_TRUNK,
+    TRUNK,
     LOW_SOC,
     DOORS_UNLOCKED,
 }
@@ -12,7 +12,7 @@ object FakePresets {
     fun snapshot(preset: FakePreset): VehicleSnapshot = when (preset) {
         FakePreset.ALL_CLEAR -> allClear()
         FakePreset.WINDOW_AND_READING -> windowAndReading()
-        FakePreset.REAR_SEAT_AND_TRUNK -> rearSeatAndTrunk()
+        FakePreset.TRUNK -> trunkOpen()
         FakePreset.LOW_SOC -> lowSoc()
         FakePreset.DOORS_UNLOCKED -> doorsUnlocked()
     }
@@ -24,7 +24,6 @@ object FakePresets {
         readingLights = listOf(ReadingLightReading(VehicleArea.ROW_1_LEFT, on = false)),
         lowBeamOn = false,
         tailLampOn = false,
-        seats = listOf(SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.VACANT)),
         hvacOn = false,
         tires = listOf(TireReading(VehicleArea.WHEEL_LEFT_FRONT, lowPressure = 0f)),
         washerLow = false,
@@ -39,12 +38,11 @@ object FakePresets {
         readingLights = listOf(ReadingLightReading(VehicleArea.ROW_2_RIGHT, on = true)),
     )
 
-    fun rearSeatAndTrunk(): VehicleSnapshot = allClear().copy(
+    fun trunkOpen(): VehicleSnapshot = allClear().copy(
         doors = listOf(
             closedLocked(VehicleArea.ROW_1_LEFT),
             DoorReading(VehicleArea.TRUNK, position = 1, locked = true),
         ),
-        seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED)),
         telltales = listOf(TelltaleReading(TelltaleKind.TRUNK_OPEN, active = true, rawName = "TRUNK_OPEN")),
     )
 

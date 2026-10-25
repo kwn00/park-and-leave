@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 
 enum class ParkIconKind {
-    OCCUPANT,
     TRUNK,
     HOOD,
     DOOR,
@@ -48,7 +47,6 @@ fun ParkIcon(kind: ParkIconKind, tint: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val pen = IconPen(this, tint)
         when (kind) {
-            ParkIconKind.OCCUPANT -> pen.occupant()
             ParkIconKind.TRUNK -> pen.trunk()
             ParkIconKind.HOOD -> pen.hood()
             ParkIconKind.DOOR -> pen.door()
@@ -149,18 +147,6 @@ private class IconPen(private val scope: DrawScope, private val tint: Color) {
         line(8.75f, 16.5f, 15.25f, 16.5f)
         circle(7f, 16.5f, 1.75f)
         circle(17f, 16.5f, 1.75f)
-    }
-
-    fun occupant() {
-        circle(12f, 7.5f, 3.5f)
-        path {
-            move(5f, 20.5f)
-            line(5f, 19.5f)
-            arc(10.5f, 19.5f, 5.5f, 180f, 90f)
-            line(13.5f, 14f)
-            arc(13.5f, 19.5f, 5.5f, 270f, 90f)
-            line(19f, 20.5f)
-        }
     }
 
     fun hood() {

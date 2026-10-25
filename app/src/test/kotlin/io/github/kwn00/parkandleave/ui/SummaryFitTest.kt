@@ -27,8 +27,8 @@ import kotlin.math.roundToInt
 
 /**
  * The summary has no scroll container, so its natural height must fit the 1682 x 1200 dp
- * app pane for every card count up to fourteen, with the tallest content each count allows.
- * The snapshot is a contact sheet of all fourteen panes, each cut at the pane height.
+ * app pane for every card count up to thirteen, with the tallest content each count allows.
+ * The snapshot is a contact sheet of all thirteen panes, each cut at the pane height.
  */
 class SummaryFitTest {
     @get:Rule
@@ -99,7 +99,7 @@ class SummaryFitTest {
     private companion object {
         const val PANE_WIDTH = 1682
         const val PANE_HEIGHT = 1200
-        const val MAX_CARDS = 14
+        const val MAX_CARDS = 13
         const val COLUMNS = 4
         const val GAP = 6
 

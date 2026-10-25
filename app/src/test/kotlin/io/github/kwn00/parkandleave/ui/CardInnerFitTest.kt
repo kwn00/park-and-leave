@@ -33,7 +33,7 @@ import kotlin.math.max
 /**
  * Hangul draws at about 1.45 em, taller than the line-height token. A card clips its children,
  * so each card's measured text stack has to fit in the card's inner height (inside the padding)
- * for every count from 1 to 14. The pane-height test does not catch glyphs cut off by the card.
+ * for every count from 1 to 13. The pane-height test does not catch glyphs cut off by the card.
  */
 class CardInnerFitTest {
     @get:Rule
@@ -136,6 +136,6 @@ class CardInnerFitTest {
 
     private companion object {
         const val PANE_WIDTH = 1682
-        const val MAX_CARDS = 14
+        const val MAX_CARDS = 13
     }
 }

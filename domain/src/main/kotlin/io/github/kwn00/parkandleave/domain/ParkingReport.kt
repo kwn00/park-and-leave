@@ -1,7 +1,6 @@
 package io.github.kwn00.parkandleave.domain
 
 enum class SignalId {
-    REAR_OCCUPANCY,
     TRUNK,
     HOOD,
     DOOR_OPEN,

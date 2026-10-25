@@ -118,7 +118,7 @@ data class SummaryDensity(
             sectionGap = 20.dp,
         )
 
-        /** Four rows: thirteen or fourteen cards, every check except the grouped telltale. */
+        /** Four rows: thirteen cards, every check except the grouped telltale. */
         val Dense = SummaryDensity(
             paneTop = ParkLeaveSpace.x1,
             paneBottom = ParkLeaveSpace.x1,

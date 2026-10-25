@@ -24,7 +24,6 @@ fun ParkLeaveApp(viewModel: ParkLeaveViewModel = viewModel()) {
             onGear = viewModel::setFakeGear,
             onCloseWindows = viewModel::closeFakeWindows,
             onReadingOff = viewModel::turnOffFakeReadingLights,
-            onClearRear = viewModel::clearFakeRearSeat,
             onCloseTrunk = viewModel::closeFakeTrunk,
         )
     }

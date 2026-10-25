@@ -14,24 +14,18 @@ import ai.pleos.playground.vehicle.listener.FuelPercentListener
 import ai.pleos.playground.vehicle.listener.HvacPowerStateListener
 import ai.pleos.playground.vehicle.listener.LightStateListener
 import ai.pleos.playground.vehicle.listener.LowWasherFluidWaringListener
-import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
-import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import ai.pleos.playground.vehicle.listener.WindowPositionListener
 import android.content.Context
 import io.github.kwn00.parkandleave.domain.DoorReading
 import io.github.kwn00.parkandleave.domain.ReadingLightReading
 import io.github.kwn00.parkandleave.domain.SdkLink
 import io.github.kwn00.parkandleave.domain.label
-import io.github.kwn00.parkandleave.domain.SeatOccupancy
-import io.github.kwn00.parkandleave.domain.SeatReading
 import io.github.kwn00.parkandleave.domain.SignalSource
 import io.github.kwn00.parkandleave.domain.TelltaleReading
 import io.github.kwn00.parkandleave.domain.TireReading
 import io.github.kwn00.parkandleave.domain.UnreadCause
 import io.github.kwn00.parkandleave.domain.UnreadSignal
 import io.github.kwn00.parkandleave.domain.VehicleArea
-import io.github.kwn00.parkandleave.domain.isRearSeat
-import io.github.kwn00.parkandleave.domain.vehicleAreaForSeatId
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.WindowReading
 import io.github.kwn00.parkandleave.domain.causeOfReadFailure
@@ -64,17 +58,11 @@ import kotlinx.coroutines.sync.withLock
  * unlocked, so the Boolean is stored that way. Hood and trunk latch release is
  * interpreted as an open closure in the check rules, not as a cabin door lock.
  * A null property value is "확인할 수 없음", not off, closed, or empty.
- *
- * Seat occupancy: SDK 2.3.2 returns Boolean true only when the raw integer is 1.
- * AAOS `SEAT_OCCUPANCY` (`0x15400BB0`) uses 0 unknown, 1 vacant, 2 occupied, so
- * that Boolean means vacant. This class prefers `CarPropertyManager` integers
- * from [readRawSeatOccupancy]. A rear UNKNOWN is "확인할 수 없음", not occupied.
- * Front seats never raise the rear card. A buckled rear belt does.
+ * Reading lights and HVAC use seat areas on the light and climate APIs.
  */
 class PleosSignalSource(
     context: Context,
     private val scope: CoroutineScope,
-    private val readRawSeatOccupancy: (areaId: Int) -> Int? = { null },
 ) {
     private val vehicle = Vehicle(context.applicationContext)
     val snapshot = MutableStateFlow(
@@ -91,9 +79,6 @@ class PleosSignalSource(
     private val doorPositionTracks = mutableListOf<Tracked<DoorArea>>()
     private val doorLockTracks = mutableListOf<Tracked<DoorArea>>()
     private val readingTracks = mutableListOf<Tracked<SeatArea>>()
-    private val seatTracks = mutableListOf<Tracked<SeatArea>>()
-    private val beltTracks = mutableListOf<Tracked<SeatArea>>()
-    private var rawSeatChannel = false
     private val hvacTracks = mutableListOf<Tracked<SeatArea>>()
     private var cabinSupported = false
     private var lowBeamSupported = false
@@ -178,7 +163,6 @@ class PleosSignalSource(
         val reading = isolate(bag, SignalSource.READING_LIGHT, emptyList()) { readReadingLights(bag) }
         val lowBeam = isolate(bag, SignalSource.LOW_BEAM, null) { readLowBeam(bag) }
         val tail = isolate(bag, SignalSource.TAIL_LAMP, null) { readTailLamp(bag) }
-        val seats = isolate(bag, SignalSource.SEATS, emptyList()) { readSeats(bag) }
         val hvac = isolate(bag, SignalSource.HVAC, emptyList()) { readHvac(bag) }
         val tires = isolate(bag, SignalSource.TIRES, emptyList()) { readTires(bag) }
         val washer = isolate(bag, SignalSource.WASHER, null) { readWasher(bag) }
@@ -202,7 +186,6 @@ class PleosSignalSource(
             readingLights = reading,
             lowBeamOn = lowBeam,
             tailLampOn = tail,
-            seats = seats,
             hvacOn = hvacOn,
             hvacZones = hvac,
             tires = tires,
@@ -413,97 +396,6 @@ class PleosSignalSource(
             if (state != null) readingTracks += Tracked(area, domain)
             ReadingLightReading(domain, state.asOn())
         }
-    }
-
-    /**
-     * A platform integer for [areaId], usually from `CarPropertyManager`.
-     * Null means that read failed and the SDK Boolean is the fallback.
-     */
-    fun applyRawSeat(areaId: Int, raw: Int) {
-        val area = vehicleAreaForSeatId(areaId) ?: return
-        rawSeatChannel = true
-        updateSeatOccupancy(area, SeatOccupancy.fromAaos(raw))
-    }
-
-    private suspend fun readSeats(bag: ScanBag): List<SeatReading> {
-        seatTracks.clear()
-        beltTracks.clear()
-        val belts = readBelts(bag)
-        val checked = awaitSdk { complete: (Pair<CapabilityConfig, List<SeatArea>>) -> Unit, fail ->
-            vehicle.getSeat().checkSeatOccupancyCapabilities(
-                onComplete = { config, areas -> complete(config to areas) },
-                onFailed = fail,
-            )
-        }
-        val (config, areas) = checked.getOrElse { error ->
-            bag.fail(SignalSource.SEATS, error, "좌석 점유 capability: ${error.shortMessage()}")
-            return belts.map { (area, buckled) ->
-                SeatReading(area, SeatOccupancy.UNKNOWN, buckled)
-            }
-        }
-        if (!config.accessType.canRead()) {
-            bag.notes += "좌석 점유 미지원 (${config.accessType.name})"
-            bag.unavailable(SignalSource.SEATS)
-            return belts.map { (area, buckled) ->
-                SeatReading(area, SeatOccupancy.UNKNOWN, buckled)
-            }
-        }
-        val fromOccupancy = areas.mapNotNull { area ->
-            val value = area.values.firstOrNull() ?: return@mapNotNull null
-            val domain = value.toArea()
-            val raw = readRawSeatOccupancy(value.id)
-            val occupancy = if (raw != null) {
-                rawSeatChannel = true
-                SeatOccupancy.fromAaos(raw)
-            } else {
-                val flag = awaitSdk<Boolean?> { complete, fail ->
-                    vehicle.getSeat().getCurrentSeatOccupancy(area, complete, fail)
-                }.getOrElse { error ->
-                    bag.fail(SignalSource.SEATS, error, "좌석 ${domain.name}: ${error.shortMessage()}")
-                    null
-                }
-                SeatOccupancy.fromSdkBoolean(flag)
-            }
-            if (domain.isRearSeat() && occupancy == SeatOccupancy.UNKNOWN) {
-                bag.missing(SignalSource.SEATS)
-            }
-            seatTracks += Tracked(area, domain)
-            SeatReading(domain, occupancy, belts[domain])
-        }
-        val covered = fromOccupancy.map { it.area }.toSet()
-        val beltOnly = belts
-            .filterKeys { it !in covered }
-            .map { (area, buckled) -> SeatReading(area, SeatOccupancy.UNKNOWN, buckled) }
-        return fromOccupancy + beltOnly
-    }
-
-    private suspend fun readBelts(bag: ScanBag): Map<VehicleArea, Boolean?> {
-        val checked = awaitSdk { complete: (Pair<CapabilityConfig, List<SeatArea>>) -> Unit, fail ->
-            vehicle.getSeat().checkSeatBeltBuckledCapabilities(
-                onComplete = { config, areas -> complete(config to areas) },
-                onFailed = fail,
-            )
-        }
-        val (config, areas) = checked.getOrElse { error ->
-            bag.notes += "안전벨트 capability: ${error.shortMessage()}"
-            return emptyMap()
-        }
-        if (!config.accessType.canRead()) {
-            bag.notes += "안전벨트 미지원 (${config.accessType.name})"
-            return emptyMap()
-        }
-        return areas.mapNotNull { area ->
-            val domain = area.values.firstOrNull()?.toArea() ?: return@mapNotNull null
-            if (!domain.isRearSeat()) return@mapNotNull null
-            val buckled = awaitSdk<Boolean?> { complete, fail ->
-                vehicle.getSeat().getCurrentSeatBeltBuckledState(area, complete, fail)
-            }.getOrElse { error ->
-                bag.notes += "안전벨트 ${domain.name}: ${error.shortMessage()}"
-                null
-            }
-            if (buckled != null) beltTracks += Tracked(area, domain)
-            domain to buckled
-        }.toMap()
     }
 
     private suspend fun readHvac(bag: ScanBag): List<ReadingLightReading> {
@@ -738,28 +630,6 @@ class PleosSignalSource(
                 unregisterActions += { lightApi.unregisterReadingLightState(tracked.sdk, listener) }
             }
         }
-        val seatApi = vehicle.getSeat()
-        seatTracks.forEach { tracked ->
-            val listener = object : SeatOccupancyListener {
-                override fun onSeatOccupancyUpdated(occupied: Boolean?) = updateSeatFromSdk(tracked.area, occupied)
-                override fun onFailed(exception: Exception) = noteFailure(SignalSource.SEATS, exception)
-            }
-            safeRegister(SignalSource.SEATS) {
-                seatApi.registerSeatOccupancy(tracked.sdk, listener)
-                unregisterActions += { seatApi.unregisterSeatOccupancy(tracked.sdk, listener) }
-            }
-        }
-        beltTracks.forEach { tracked ->
-            val listener = object : SeatBeltBuckledStateListener {
-                override fun onSeatBeltBuckledStateUpdated(state: Boolean?) = updateBelt(tracked.area, state)
-                override fun onFailed(exception: Exception) = Unit
-            }
-            try {
-                seatApi.registerSeatBeltBuckledState(tracked.sdk, listener)
-                unregisterActions += { seatApi.unregisterSeatBeltBuckledState(tracked.sdk, listener) }
-            } catch (_: Exception) {
-            }
-        }
         val hvacApi = vehicle.getHVAC()
         hvacTracks.forEach { tracked ->
             val listener = object : HvacPowerStateListener {
@@ -917,50 +787,6 @@ class PleosSignalSource(
                 },
             )
         }
-    }
-
-    private fun updateSeatFromSdk(area: VehicleArea, flag: Boolean?) {
-        if (rawSeatChannel) return
-        updateSeatOccupancy(area, SeatOccupancy.fromSdkBoolean(flag))
-    }
-
-    private fun updateSeatOccupancy(area: VehicleArea, occupancy: SeatOccupancy) {
-        snapshot.update { current ->
-            val seats = if (current.seats.any { it.area == area }) {
-                current.seats.map { seat ->
-                    if (seat.area == area) seat.copy(occupancy = occupancy) else seat
-                }
-            } else {
-                current.seats + SeatReading(area, occupancy)
-            }
-            current.copy(seats = seats).withRearSeatUnread()
-        }
-    }
-
-    private fun updateBelt(area: VehicleArea, buckled: Boolean?) {
-        snapshot.update { current ->
-            val seats = if (current.seats.any { it.area == area }) {
-                current.seats.map { seat ->
-                    if (seat.area == area) seat.copy(beltBuckled = buckled) else seat
-                }
-            } else {
-                current.seats + SeatReading(area, SeatOccupancy.UNKNOWN, buckled)
-            }
-            current.copy(seats = seats)
-        }
-    }
-
-    private fun VehicleSnapshot.withRearSeatUnread(): VehicleSnapshot {
-        val rearUnknown = seats.any { it.area.isRearSeat() && it.occupancy == SeatOccupancy.UNKNOWN }
-        val withoutNull = unread.filterNot {
-            it.source == SignalSource.SEATS && it.cause == UnreadCause.NULL_VALUE
-        }
-        val nextUnread = if (rearUnknown) {
-            withoutNull + UnreadSignal(SignalSource.SEATS, UnreadCause.NULL_VALUE)
-        } else {
-            withoutNull
-        }
-        return copy(unread = nextUnread)
     }
 
     private fun updateHvac(area: VehicleArea, power: Boolean?) {

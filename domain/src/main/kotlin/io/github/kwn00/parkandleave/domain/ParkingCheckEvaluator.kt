@@ -10,7 +10,6 @@ object ParkingThresholds {
 class ParkingCheckEvaluator {
     fun evaluate(snapshot: VehicleSnapshot): ParkingReport {
         val items = buildList {
-            addRearOccupancy(snapshot)
             addTrunk(snapshot)
             addHood(snapshot)
             addOpenDoors(snapshot)
@@ -44,22 +43,6 @@ class ParkingCheckEvaluator {
             clearanceLine = if (allClear) "내려도 됩니다" else null,
             speechLine = speechLine(items),
             uncheckedLines = unread.map { it.line() },
-        )
-    }
-
-    private fun MutableList<CheckItem>.addRearOccupancy(snapshot: VehicleSnapshot) {
-        val occupied = snapshot.seats.filter {
-            it.area.isRearSeat() && it.occupancy == SeatOccupancy.OCCUPIED
-        }
-        if (occupied.isEmpty()) return
-        add(
-            item(
-                SignalId.REAR_OCCUPANCY,
-                Severity.WARNING,
-                "뒷좌석 확인",
-                areaDetail(occupied.map { it.area }, { "${it.label()} 점유" }, "점유"),
-                "뒷좌석을 확인하세요",
-            ),
         )
     }
 

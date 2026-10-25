@@ -4,7 +4,6 @@ import io.github.kwn00.parkandleave.designsystem.ParkIconKind
 import io.github.kwn00.parkandleave.domain.SignalId
 
 fun iconFor(id: SignalId): ParkIconKind = when (id) {
-    SignalId.REAR_OCCUPANCY -> ParkIconKind.OCCUPANT
     SignalId.TRUNK -> ParkIconKind.TRUNK
     SignalId.HOOD -> ParkIconKind.HOOD
     SignalId.DOOR_OPEN -> ParkIconKind.DOOR

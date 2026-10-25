@@ -33,7 +33,6 @@ fun DebugScreen(
     onGear: (Gear) -> Unit,
     onCloseWindows: () -> Unit,
     onReadingOff: () -> Unit,
-    onClearRear: () -> Unit,
     onCloseTrunk: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -103,7 +102,7 @@ fun DebugScreen(
             item { Text("모의 시나리오", style = MaterialTheme.typography.titleLarge, color = colors.onSurface) }
             item { ActionButton("모두 정상", { onPreset(FakePreset.ALL_CLEAR) }, Modifier.fillMaxWidth()) }
             item { ActionButton("창문 + 독서등", { onPreset(FakePreset.WINDOW_AND_READING) }, Modifier.fillMaxWidth()) }
-            item { ActionButton("뒷좌석 + 트렁크", { onPreset(FakePreset.REAR_SEAT_AND_TRUNK) }, Modifier.fillMaxWidth()) }
+            item { ActionButton("트렁크 열림", { onPreset(FakePreset.TRUNK) }, Modifier.fillMaxWidth()) }
             item { ActionButton("낮은 배터리", { onPreset(FakePreset.LOW_SOC) }, Modifier.fillMaxWidth()) }
             item { ActionButton("도어 잠금 해제", { onPreset(FakePreset.DOORS_UNLOCKED) }, Modifier.fillMaxWidth()) }
             item { Text("모의 기어", style = MaterialTheme.typography.titleLarge, color = colors.onSurface) }
@@ -119,7 +118,6 @@ fun DebugScreen(
             item { Text("해소", style = MaterialTheme.typography.titleLarge, color = colors.onSurface) }
             item { ActionButton("창문 닫힘", onCloseWindows, Modifier.fillMaxWidth()) }
             item { ActionButton("독서등 끔", onReadingOff, Modifier.fillMaxWidth()) }
-            item { ActionButton("뒷좌석 비움", onClearRear, Modifier.fillMaxWidth()) }
             item { ActionButton("트렁크 닫힘", onCloseTrunk, Modifier.fillMaxWidth()) }
         }
     }

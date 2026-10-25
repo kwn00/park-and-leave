@@ -4,11 +4,9 @@ import io.github.kwn00.parkandleave.domain.FakePreset
 import io.github.kwn00.parkandleave.domain.FakePresets
 import io.github.kwn00.parkandleave.domain.Gear
 import io.github.kwn00.parkandleave.domain.GearReading
-import io.github.kwn00.parkandleave.domain.SeatOccupancy
 import io.github.kwn00.parkandleave.domain.TelltaleKind
 import io.github.kwn00.parkandleave.domain.VehicleArea
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
-import io.github.kwn00.parkandleave.domain.isRearSeat
 import io.github.kwn00.parkandleave.domain.rawCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -36,18 +34,6 @@ class FakeSignalBoard {
 
     fun turnOffReadingLights() = snapshot.update { current ->
         current.copy(readingLights = current.readingLights.map { it.copy(on = false) })
-    }
-
-    fun clearRearSeat() = snapshot.update { current ->
-        current.copy(
-            seats = current.seats.map { seat ->
-                if (seat.area.isRearSeat()) {
-                    seat.copy(occupancy = SeatOccupancy.VACANT, beltBuckled = false)
-                } else {
-                    seat
-                }
-            },
-        )
     }
 
     fun closeTrunk() = snapshot.update { current ->

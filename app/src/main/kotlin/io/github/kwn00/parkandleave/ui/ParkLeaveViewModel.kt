@@ -88,11 +88,7 @@ data class ParkUiState(
 class ParkLeaveViewModel(application: Application) : AndroidViewModel(application) {
     private val evaluator = ParkingCheckEvaluator()
     private val aaos = AaosSignals(application)
-    private val vehicle = PleosSignalSource(
-        application,
-        viewModelScope,
-        readRawSeatOccupancy = aaos::readSeatOccupancy,
-    )
+    private val vehicle = PleosSignalSource(application, viewModelScope)
     private val fake = FakeSignalBoard()
     private val control = UnavailableVehicleControl()
     private val places = DefaultPlaceProfileSource()
@@ -187,7 +183,6 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
     )
 
     init {
-        aaos.setSeatOccupancyListener { areaId, raw -> vehicle.applyRawSeat(areaId, raw) }
         aaos.start()
         vehicle.start()
         viewModelScope.launch {
@@ -269,8 +264,6 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
     fun closeFakeWindows() = mutateFake { fake.closeWindows() }
 
     fun turnOffFakeReadingLights() = mutateFake { fake.turnOffReadingLights() }
-
-    fun clearFakeRearSeat() = mutateFake { fake.clearRearSeat() }
 
     fun closeFakeTrunk() = mutateFake { fake.closeTrunk() }
 

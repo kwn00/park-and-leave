@@ -4,8 +4,6 @@ import io.github.kwn00.parkandleave.domain.DoorReading
 import io.github.kwn00.parkandleave.domain.FakePresets
 import io.github.kwn00.parkandleave.domain.ParkingCheckEvaluator
 import io.github.kwn00.parkandleave.domain.ReadingLightReading
-import io.github.kwn00.parkandleave.domain.SeatOccupancy
-import io.github.kwn00.parkandleave.domain.SeatReading
 import io.github.kwn00.parkandleave.domain.SignalSource
 import io.github.kwn00.parkandleave.domain.TelltaleKind
 import io.github.kwn00.parkandleave.domain.TelltaleReading
@@ -36,10 +34,6 @@ internal object ParkedScenarios {
             DoorReading(VehicleArea.TRUNK, position = 0, locked = true),
         ),
         readingLights = cabinDoors.map { ReadingLightReading(it, on = false) },
-        seats = listOf(
-            SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.VACANT),
-            SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.VACANT),
-        ),
         washerLow = null,
         tripDistance = null,
         unread = listOf(
@@ -50,10 +44,7 @@ internal object ParkedScenarios {
     )
 
     val fiveIssues: VehicleSnapshot = calm.copy(
-        seats = listOf(
-            SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED),
-            SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.VACANT),
-        ),
+        cabinLightOn = true,
         doors = calm.doors.map { if (it.area == VehicleArea.HOOD) it.copy(position = 1) else it },
         windows = calm.windows.map { if (it.area == VehicleArea.ROW_2_RIGHT) it.copy(position = 3) else it },
         hvacOn = true,
@@ -80,7 +71,6 @@ internal object ParkedScenarios {
         readingLights = listOf(ReadingLightReading(VehicleArea.ROW_2_RIGHT, on = true)),
         lowBeamOn = true,
         tailLampOn = false,
-        seats = listOf(SeatReading(VehicleArea.ROW_3_RIGHT, SeatOccupancy.OCCUPIED)),
         hvacOn = true,
         tires = listOf(TireReading(VehicleArea.WHEEL_RIGHT_FRONT, lowPressure = 1f)),
         washerLow = true,
@@ -107,10 +97,6 @@ internal object ParkedScenarios {
                 ReadingLightReading(VehicleArea.ROW_2_RIGHT, on = true),
             ),
             tailLampOn = true,
-            seats = listOf(
-                SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.OCCUPIED),
-                SeatReading(VehicleArea.ROW_3_RIGHT, SeatOccupancy.OCCUPIED),
-            ),
             tires = listOf(
                 TireReading(VehicleArea.WHEEL_RIGHT_FRONT, lowPressure = 1f),
                 TireReading(VehicleArea.WHEEL_RIGHT_REAR, lowPressure = 1f),
@@ -137,11 +123,6 @@ internal object ParkedScenarios {
                 ReadingLightReading(VehicleArea.ROW_1_RIGHT, on = true),
                 ReadingLightReading(VehicleArea.ROW_2_CENTER, on = true),
                 ReadingLightReading(VehicleArea.ROW_2_RIGHT, on = true),
-            ),
-            seats = listOf(
-                SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED),
-                SeatReading(VehicleArea.ROW_2_CENTER, SeatOccupancy.OCCUPIED),
-                SeatReading(VehicleArea.ROW_3_RIGHT, SeatOccupancy.OCCUPIED),
             ),
             tires = listOf(
                 TireReading(VehicleArea.WHEEL_LEFT_FRONT, lowPressure = 1f),
@@ -175,7 +156,7 @@ internal object ParkedScenarios {
      * Every check except the grouped telltale fails, most with two places so their bodies take two
      * lines. Telltales read clean, so the panel still has a chip above the unchecked line.
      */
-    val fourteenIssues: VehicleSnapshot = everyItemManyPlaces.first().let { many ->
+    val thirteenIssues: VehicleSnapshot = everyItemManyPlaces.first().let { many ->
         many.copy(
             doors = many.doors + DoorReading(VehicleArea.HOOD, position = 1, locked = true),
             telltales = listOf(TelltaleReading(TelltaleKind.ENGINE, active = false, rawName = "ENGINE")),
@@ -184,23 +165,26 @@ internal object ParkedScenarios {
         )
     }
 
-    /** Charge and fuel recover: twelve cards, three rows, three chips. */
-    val twelveIssues: VehicleSnapshot = fourteenIssues.copy(socPercent = 80, fuelPercent = 60)
+    /**
+     * Charge and fuel recover. That is eleven cards: the thirteen-card set without battery and fuel.
+     * Three rows, and chips for 배터리, 연료, and 경고등.
+     */
+    val elevenIssues: VehicleSnapshot = thirteenIssues.copy(socPercent = 80, fuelPercent = 60)
 
     /** Everything read and fine, telltales included, so leftover checks become chips. */
     private val allRead: VehicleSnapshot = calm.copy(
         washerLow = false,
-        telltales = fourteenIssues.telltales,
-        unread = fourteenIssues.unread,
+        telltales = thirteenIssues.telltales,
+        unread = thirteenIssues.unread,
     )
 
     /**
-     * The tallest summary for [count] cards: the first [count] of [fourteenIssues] in evaluator
+     * The tallest summary for [count] cards: the first [count] of [thirteenIssues] in evaluator
      * order put a two-line body in every row, the headline carries both context lines, and the
      * panel shows every remaining chip and the unchecked line.
      */
     fun tallest(count: Int): ParkUiState {
-        val report = ParkingCheckEvaluator().evaluate(fourteenIssues)
+        val report = ParkingCheckEvaluator().evaluate(thirteenIssues)
         val cards = summaryCards(report, seen = emptyList()).take(count)
         return previewState(
             report = report.copy(items = report.items.take(count), headline = "확인 ${count}건"),
@@ -211,7 +195,7 @@ internal object ParkedScenarios {
 
     /** All clear after [count] issues were fixed in this parked session. */
     fun resolved(count: Int): ParkUiState {
-        val seen = rememberSeen(emptyList(), ParkingCheckEvaluator().evaluate(fourteenIssues).items.take(count))
+        val seen = rememberSeen(emptyList(), ParkingCheckEvaluator().evaluate(thirteenIssues).items.take(count))
         val report = ParkingCheckEvaluator().evaluate(allRead)
         val cards = summaryCards(report, seen)
         return previewState(

@@ -18,7 +18,6 @@ enum class SignalSource {
     READING_LIGHT,
     LOW_BEAM,
     TAIL_LAMP,
-    SEATS,
     HVAC,
     TIRES,
     WASHER,
@@ -101,7 +100,6 @@ fun SignalSource.label(): String = when (this) {
     SignalSource.READING_LIGHT -> "독서등"
     SignalSource.LOW_BEAM -> "하향등"
     SignalSource.TAIL_LAMP -> "미등"
-    SignalSource.SEATS -> "뒷좌석"
     SignalSource.HVAC -> "공조"
     SignalSource.TIRES -> "타이어"
     SignalSource.WASHER -> "워셔액"
