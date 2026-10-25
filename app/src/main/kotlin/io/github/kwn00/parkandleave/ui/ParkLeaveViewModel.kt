@@ -22,6 +22,7 @@ import io.github.kwn00.parkandleave.domain.SessionPhase
 import io.github.kwn00.parkandleave.domain.SummaryCard
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.checkSession
+import io.github.kwn00.parkandleave.domain.confirmedLabels
 import io.github.kwn00.parkandleave.domain.formatDebugRows
 import io.github.kwn00.parkandleave.domain.reducePark
 import io.github.kwn00.parkandleave.domain.reportFor
@@ -80,6 +81,7 @@ data class ParkUiState(
     val controlAvailable: Boolean,
     val placeLabel: String,
     val cards: List<SummaryCard>,
+    val confirmed: List<String>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -149,6 +151,11 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             DataOrigin.LIVE -> "실측"
             DataOrigin.FAKE -> "모의"
         }
+        val cards = if (report != null && session.phase == SessionPhase.ACTIVE) {
+            summaryCards(report, seenIssues)
+        } else {
+            emptyList()
+        }
         ParkUiState(
             origin = selection.origin,
             screen = selection.screen,
@@ -166,8 +173,9 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             speechMode = speaker.modeLabel,
             controlAvailable = control.available,
             placeLabel = places.activeProfile().name,
-            cards = if (report != null && session.phase == SessionPhase.ACTIVE) {
-                summaryCards(report, seenIssues)
+            cards = cards,
+            confirmed = if (report != null && session.phase == SessionPhase.ACTIVE) {
+                confirmedLabels(vehicleSide.snapshot, cards.map { it.id }.toSet())
             } else {
                 emptyList()
             },
@@ -296,6 +304,7 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             controlAvailable = false,
             placeLabel = places.activeProfile().name,
             cards = emptyList(),
+            confirmed = emptyList(),
         )
     }
 }

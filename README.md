@@ -7,7 +7,7 @@
 - P에 들어가면 차량 상태를 한 번 읽고, P를 벗어났다가 다시 들어오면 다시 읽습니다.
 - 확인 카드는 창문, 도어, 잠금, 보닛, 트렁크, 조명, 뒷좌석, 공조, 타이어, 워셔액, 배터리, 연료, 읽을 수 있는 경고등입니다. 보닛과 트렁크는 도어 잠금에 섞지 않고 "보닛 열림", "트렁크 열림"으로 둡니다.
 - 이번 정차에서 해결된 항목은 "해결됨"으로 남고, 정차가 끝나면 지워집니다.
-- 카드 수에 따라 배치가 바뀝니다. 1장이면 가운데 큰 카드, 2–3장이면 한 줄, 그 이상이면 최대 4열입니다. 카드는 화면 높이를 채우지 않습니다.
+- 카드 수에 따라 배치가 바뀝니다. 1장은 영역 너비의 약 3/4을 쓰는 큰 카드이고, 할 일을 한 줄로 적습니다. 2장은 같은 높이로 너비를 채웁니다. 3장부터는 최대 4열입니다. 카드 아래에는 정상으로 확인된 항목을 작은 표시로 두고, 확인할 수 없는 항목은 그 구역에 한 줄로 둡니다.
 - 신호마다 실패를 따로 처리합니다. 한 항목의 `SecurityException`이나 미제공이 다른 항목을 지우지 않습니다.
 - 값이 null이면 정상으로 세지 않고 "확인할 수 없음"으로 둡니다.
 - 차량 서비스가 연결되지 않았거나 끊기면 카드를 정상으로 두지 않고 "차량 서비스: 연결되지 않음"을 보여 줍니다.
@@ -17,19 +17,21 @@
 
 에뮬레이터에서 앱이 차지하는 넓은 영역을 기준으로 한 화면입니다.
 
-한 장일 때 카드는 가운데에 있고, 아이콘과 제목이 더 큽니다.
+한 장은 가운데에 넓게 두고, 아이콘과 제목, 본문, 조치 한 줄을 키웁니다. 두 장은 그 글자 크기로 나란히 채웁니다. 카드 아래는 정상으로 확인된 항목입니다.
 
 ![확인 1건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardDay_summary-one-day.png)
 
 ![확인 1건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardNight_summary-one-night.png)
 
-두 장은 한 줄입니다.
-
 ![확인 2건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsDay_summary-two-day.png)
 
 ![확인 2건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsNight_summary-two-night.png)
 
-다섯 장은 최대 4열 격자입니다.
+세 장부터는 최대 4열이고, 정상 항목 표시는 카드보다 작게 둡니다.
+
+![확인 3건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_threeCardsDay_summary-three-day.png)
+
+![확인 3건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_threeCardsNight_summary-three-night.png)
 
 ![확인 5건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_fiveCardsDay_summary-five-day.png)
 
