@@ -9,13 +9,12 @@ class SummaryBoardTest {
     private val evaluator = ParkingCheckEvaluator()
 
     @Test
-    fun oneCardIsSpotlightTwoOrThreeAreOneRow() {
-        assertEquals(SummaryLayout.SPOTLIGHT, summaryLayout(0))
-        assertEquals(SummaryLayout.SPOTLIGHT, summaryLayout(1))
-        assertEquals(SummaryLayout.ROW, summaryLayout(2))
-        assertEquals(SummaryLayout.ROW, summaryLayout(3))
-        assertEquals(SummaryLayout.GRID, summaryLayout(4))
-        assertEquals(SummaryLayout.GRID, summaryLayout(5))
+    fun fewCardsKeepTheSameSlotAsAFullRow() {
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 1))
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 2))
+        assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 5))
+        assertEquals(3, summaryGridColumns(widthDp = 1200, cardCount = 2))
+        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 0))
     }
 
     @Test
@@ -25,11 +24,9 @@ class SummaryBoardTest {
     }
 
     @Test
-    fun fewerCardsStillSpanTheRow() {
-        assertEquals(2, summaryGridColumns(widthDp = 1682, cardCount = 2))
-        assertEquals(3, summaryGridColumns(widthDp = 1200, cardCount = 3))
-        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 1))
-        assertEquals(1, summaryGridColumns(widthDp = 1682, cardCount = 0))
+    fun narrowerWindowsDropAColumnEvenForOneCard() {
+        assertEquals(2, summaryGridColumns(widthDp = 1079, cardCount = 1))
+        assertEquals(1, summaryGridColumns(widthDp = 719, cardCount = 3))
     }
 
     @Test
@@ -51,7 +48,7 @@ class SummaryBoardTest {
     fun activeCardsKeepSeverityOrderAndAreNotResolved() {
         val report = evaluator.evaluate(
             FakePresets.allClear().copy(
-                seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, occupied = true)),
+                seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED)),
                 hvacOn = true,
             ),
         )
@@ -60,6 +57,7 @@ class SummaryBoardTest {
         assertTrue(cards.any { it.tone == CardTone.WARN })
         assertTrue(cards.none { it.resolved })
         assertEquals(report.items.map { it.id }, cards.map { it.id })
+        assertEquals("뒷좌석을 확인하세요", cards.first().guidance)
         assertEquals(HeadlineTone.CRITICAL, headlineTone(report.allClear, cards))
     }
 
@@ -82,6 +80,8 @@ class SummaryBoardTest {
         assertEquals(RESOLVED_DETAIL, resolved.detail)
         assertTrue(resolved.resolved)
         assertEquals("창문 열림", resolved.title)
+        assertEquals("", resolved.guidance)
+        assertEquals("독서등을 꺼 주세요", cards.first().guidance)
         assertEquals(HeadlineTone.WARN, headlineTone(after.allClear, cards))
     }
 
@@ -155,5 +155,89 @@ class SummaryBoardTest {
         assertTrue(seenForSession(SessionPhase.FROZEN, seen, report).isEmpty())
         assertEquals(seen, seenForSession(SessionPhase.ACTIVE, seen, report = null))
         assertEquals(seen, seenForSession(SessionPhase.ACTIVE, seen, report))
+    }
+
+    @Test
+    fun clearSnapshotListsSignalsThatWereReadAndFine() {
+        assertEquals(
+            listOf(
+                "창문",
+                "도어",
+                "도어 잠금",
+                "실내등",
+                "독서등",
+                "외부등",
+                "뒷좌석",
+                "공조",
+                "타이어",
+                "워셔액",
+                "배터리",
+                "연료",
+            ),
+            confirmedLabels(FakePresets.allClear(), emptySet()),
+        )
+    }
+
+    @Test
+    fun openWindowAndOccupiedRearDropThoseChips() {
+        val windows = confirmedLabels(FakePresets.windowAndReading(), emptySet())
+        assertFalse(windows.contains("창문"))
+        assertFalse(windows.contains("독서등"))
+        assertTrue(windows.contains("실내등"))
+
+        val rear = FakePresets.rearSeatAndTrunk()
+        val openIds = evaluator.evaluate(rear).items.map { it.id }.toSet()
+        val labels = confirmedLabels(rear, openIds)
+        assertFalse(labels.contains("뒷좌석"))
+        assertFalse(labels.contains("트렁크"))
+        assertFalse(labels.contains("경고등"))
+        assertTrue(labels.contains("창문"))
+    }
+
+    @Test
+    fun unreadOrMissingValueIsNotAConfirmedChip() {
+        val cabinUnread = FakePresets.allClear().copy(
+            unread = listOf(UnreadSignal(SignalSource.CABIN_LIGHT, UnreadCause.NULL_VALUE)),
+        )
+        assertFalse(confirmedLabels(cabinUnread, emptySet()).contains("실내등"))
+
+        val noSoc = FakePresets.allClear().copy(socPercent = null)
+        val noSocLabels = confirmedLabels(noSoc, emptySet())
+        assertFalse(noSocLabels.contains("배터리"))
+        assertTrue(noSocLabels.contains("연료"))
+
+        val evWithoutFuel = FakePresets.allClear().copy(
+            fuelPercent = null,
+            unread = listOf(UnreadSignal(SignalSource.FUEL, UnreadCause.NULL_VALUE)),
+        )
+        assertFalse(confirmedLabels(evWithoutFuel, emptySet()).contains("연료"))
+        assertTrue(confirmedLabels(evWithoutFuel, emptySet()).contains("배터리"))
+    }
+
+    @Test
+    fun beltAndCardIdsDoNotInventAFineChip() {
+        val belted = FakePresets.allClear().copy(
+            seats = listOf(
+                SeatReading(
+                    VehicleArea.ROW_2_RIGHT,
+                    SeatOccupancy.VACANT,
+                    beltBuckled = false,
+                ),
+            ),
+        )
+        assertTrue(confirmedLabels(belted, emptySet()).contains("뒷좌석"))
+
+        val openHood = FakePresets.allClear().copy(
+            doors = FakePresets.allClear().doors + DoorReading(
+                VehicleArea.HOOD,
+                position = 0,
+                locked = false,
+            ),
+        )
+        assertFalse(confirmedLabels(openHood, emptySet()).contains("보닛"))
+        assertFalse(confirmedLabels(FakePresets.allClear(), setOf(SignalId.WINDOW)).contains("창문"))
+        assertTrue(
+            confirmedLabels(FakePresets.allClear().copy(link = SdkLink.DISCONNECTED), emptySet()).isEmpty(),
+        )
     }
 }

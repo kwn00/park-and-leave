@@ -7,7 +7,7 @@
 - P에 들어가면 차량 상태를 한 번 읽고, P를 벗어났다가 다시 들어오면 다시 읽습니다.
 - 확인 카드는 창문, 도어, 잠금, 보닛, 트렁크, 조명, 뒷좌석, 공조, 타이어, 워셔액, 배터리, 연료, 읽을 수 있는 경고등입니다. 보닛과 트렁크는 도어 잠금에 섞지 않고 "보닛 열림", "트렁크 열림"으로 둡니다.
 - 이번 정차에서 해결된 항목은 "해결됨"으로 남고, 정차가 끝나면 지워집니다.
-- 카드 수에 따라 배치가 바뀝니다. 1장이면 가운데 큰 카드, 2–3장이면 한 줄, 그 이상이면 최대 4열입니다. 카드는 화면 높이를 채우지 않습니다.
+- 확인 카드는 장수와 상관없이 4열 한 칸과 같은 크기입니다. 왼쪽부터 채우고, 다섯 장째부터 다음 줄로 넘어갑니다. 한 줄의 카드는 높이가 같습니다. 본문은 최대 두 줄이고, 그 아래 조치 한 줄이 있습니다. 카드 아래에는 정상으로 확인된 항목을 내용 높이만큼 둡니다.
 - 신호마다 실패를 따로 처리합니다. 한 항목의 `SecurityException`이나 미제공이 다른 항목을 지우지 않습니다.
 - 값이 null이면 정상으로 세지 않고 "확인할 수 없음"으로 둡니다.
 - 차량 서비스가 연결되지 않았거나 끊기면 카드를 정상으로 두지 않고 "차량 서비스: 연결되지 않음"을 보여 줍니다.
@@ -17,19 +17,21 @@
 
 에뮬레이터에서 앱이 차지하는 넓은 영역을 기준으로 한 화면입니다.
 
-한 장일 때 카드는 가운데에 있고, 아이콘과 제목이 더 큽니다.
+카드는 한 장이어도 네 장일 때와 같은 너비로 왼쪽에 붙습니다. 아래 영역은 정상으로 확인된 항목이고, 화면 아래까지 늘어나지 않습니다.
 
 ![확인 1건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardDay_summary-one-day.png)
 
 ![확인 1건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardNight_summary-one-night.png)
 
-두 장은 한 줄입니다.
-
 ![확인 2건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsDay_summary-two-day.png)
 
 ![확인 2건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsNight_summary-two-night.png)
 
-다섯 장은 최대 4열 격자입니다.
+세 장과 다섯 장도 같은 카드 크기입니다. 다섯 장은 다음 줄로 넘어갑니다.
+
+![확인 3건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_threeCardsDay_summary-three-day.png)
+
+![확인 3건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_threeCardsNight_summary-three-night.png)
 
 ![확인 5건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_fiveCardsDay_summary-five-day.png)
 
@@ -49,7 +51,7 @@
 | 도어 위치 | `Door.checkDoorPositionCapabilities`, `getCurrentDoorPosition`, `registerDoorPosition` |
 | 도어 잠금 | `Door.checkDoorLockCapabilities`, `getDoorLockState`, `registerDoorLockState` |
 | 실내등, 하향등, 미등, 독서등 | `Light.check*Capabilities`, `getCurrent*`, `register*` |
-| 뒷좌석 | `Seat.checkSeatOccupancyCapabilities`, `getCurrentSeatOccupancy`, `registerSeatOccupancy` |
+| 뒷좌석 점유 | `CarPropertyManager.getIntProperty(SEAT_OCCUPANCY, area)`, SDK `Seat.checkSeatOccupancyCapabilities`, `getCurrentSeatOccupancy`, `registerSeatOccupancy` |
 | 공조 | `HVAC.checkHvacPowerCapabilities`, `getHvacPowerState`, `registerHvacPowerState` |
 | 타이어 저압 | `Tire.checkLowTirePressureCapabilities`, `getLowTirePressure` |
 | 워셔액 | `Safety.checkLowWasherFluidWarningStateCapabilities`, `hasLowWasherFluidWarning`, `registerLowWasherFluidWaringState` |
@@ -61,6 +63,8 @@
 선언한 권한은 `android.car.permission.CAR_POWERTRAIN`과 `pleos.car.permission.CAR_WINDOWS`, `CAR_DOORS`, `CAR_LIGHTS`, `CAR_SEATS`, `CAR_SAFETY`, `CAR_ENERGY`, `CAR_DRIVE`, `CAR_CLIMATE`입니다. `PRIVATE_*`와 `CONTROL_*`는 선언하지 않습니다.
 
 도어 잠금 Boolean은 SDK `setDoorLock` 설명대로 true가 잠김, false가 해제입니다. 도어 위치는 최소값 0이 닫힘이고 그보다 크면 열림입니다. 보닛과 트렁크는 위치가 열려 있거나 래치가 풀리면 각각의 열림 카드로 두고, 실내 도어 잠금 카드에는 넣지 않습니다. SOC 값이 있으면 연료는 확인할 수 없는 항목에서 뺍니다.
+
+좌석 점유는 AAOS `VehiclePropertyIds.SEAT_OCCUPANCY`(`356518832`, `0x15400BB0`)입니다. 값은 0 알 수 없음, 1 공석, 2 점유입니다. 영역 비트는 1열 왼쪽 1, 가운데 2, 오른쪽 4, 2열 왼쪽 16, 가운데 32, 오른쪽 64, 3열 왼쪽 256, 가운데 512, 오른쪽 1024이며 SDK `SeatConstant`와 같습니다. SDK 2.3.2 `getCurrentSeatOccupancy` Boolean은 원시 정수가 1일 때만 true라서 공석을 뜻하고, false는 0·2·파싱 실패를 구분하지 못합니다. 그래서 정수 읽기가 되면 그 값을 쓰고, 실패하면 Boolean true만 공석으로 둡니다. 0과 구분 못한 값은 점유가 아니라 뒷좌석 "확인할 수 없음"입니다. 카드는 2열·3열의 점유(2)만 올리고, 1열이나 운전석이 비는 것은 조건이 아닙니다. 안전벨트 `SEAT_BELT_BUCKLED`는 Boolean(`true`가 체결)이라 점유 값과 섞지 않고 디버그 행에만 둡니다. Virtual Console에서는 Emulation Controls > Convenience > Seat Occupancy에서 영역마다 이 값을 바꿉니다.
 
 ## 정차 중에만
 

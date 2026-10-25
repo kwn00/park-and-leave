@@ -48,14 +48,16 @@ class ParkingCheckEvaluator {
     }
 
     private fun MutableList<CheckItem>.addRearOccupancy(snapshot: VehicleSnapshot) {
-        val occupied = snapshot.seats.filter { it.occupied == true && it.area.isRearSeat() }
+        val occupied = snapshot.seats.filter {
+            it.area.isRearSeat() && it.occupancy == SeatOccupancy.OCCUPIED
+        }
         if (occupied.isEmpty()) return
         add(
             item(
                 SignalId.REAR_OCCUPANCY,
                 Severity.WARNING,
                 "뒷좌석 확인",
-                occupied.joinToString(" · ") { "${it.area.label()} 점유" },
+                areaDetail(occupied.map { it.area }, { "${it.label()} 점유" }, "점유"),
                 "뒷좌석을 확인하세요",
             ),
         )
@@ -91,7 +93,7 @@ class ParkingCheckEvaluator {
                 SignalId.DOOR_OPEN,
                 Severity.WARNING,
                 "도어 열림",
-                open.joinToString(" · ") { "${it.area.label()} 열림" },
+                areaDetail(open.map { it.area }, { "${it.label()} 열림" }, "열림"),
                 "도어를 닫아 주세요",
             ),
         )
@@ -105,7 +107,7 @@ class ParkingCheckEvaluator {
                 SignalId.TIRE,
                 Severity.WARNING,
                 "타이어 저압",
-                low.joinToString(" · ") { it.area.label() },
+                areaDetail(low.map { it.area }, { it.label() }, ""),
                 "타이어 공기압을 점검하세요",
             ),
         )
@@ -119,7 +121,7 @@ class ParkingCheckEvaluator {
                 SignalId.WINDOW,
                 Severity.CAUTION,
                 "창문 열림",
-                open.joinToString(" · ") { windowDetail(it) },
+                windowSummary(open),
                 "해당 창문을 닫아 주세요",
             ),
         )
@@ -133,7 +135,7 @@ class ParkingCheckEvaluator {
                 SignalId.DOOR_UNLOCKED,
                 Severity.CAUTION,
                 "도어 잠금 해제",
-                unlocked.joinToString(" · ") { "${it.area.label()} 잠금 해제" },
+                areaDetail(unlocked.map { it.area }, { "${it.label()} 잠금 해제" }, ""),
                 "도어 잠금 버튼을 눌러 주세요",
             ),
         )
@@ -152,7 +154,7 @@ class ParkingCheckEvaluator {
                 SignalId.READING_LIGHT,
                 Severity.CAUTION,
                 "독서등 켜짐",
-                on.joinToString(" · ") { "${it.area.label()} 켜짐" },
+                areaDetail(on.map { it.area }, { "${it.label()} 켜짐" }, ""),
                 "독서등을 꺼 주세요",
             ),
         )
@@ -213,7 +215,7 @@ class ParkingCheckEvaluator {
                     SignalId.TELLTALE,
                     Severity.WARNING,
                     "경고등",
-                    faults.joinToString(" · ") { it.rawName },
+                    telltaleDetail(faults),
                     "경고등을 확인하세요",
                 ),
             )
@@ -273,6 +275,121 @@ private fun item(
 private fun windowDetail(reading: WindowReading): String {
     val percent = if (reading.maxPosition > 0) " ${reading.position * 100 / reading.maxPosition}%" else ""
     return "${reading.area.label()}$percent"
+}
+
+private fun windowSummary(open: List<WindowReading>): String {
+    if (open.size < 3) return open.joinToString(" · ") { windowDetail(it) }
+    return compactSeatPlaces(open.map { it.area }) ?: "${open.size}곳"
+}
+
+/**
+ * One or two places keep their own labels. Three or more collapse to a row phrase
+ * such as "1열·2열 양쪽", or to a count when the areas are not seat rows.
+ */
+private fun areaDetail(
+    areas: List<VehicleArea>,
+    single: (VehicleArea) -> String,
+    groupSuffix: String,
+): String {
+    if (areas.size < 3) return areas.joinToString(" · ") { single(it) }
+    val places = compactSeatPlaces(areas)
+    if (places != null) {
+        return if (groupSuffix.isEmpty()) places else "$places $groupSuffix"
+    }
+    return if (groupSuffix.isEmpty()) "${areas.size}곳" else "${areas.size}곳 $groupSuffix"
+}
+
+private fun telltaleDetail(faults: List<TelltaleReading>): String {
+    if (faults.size < 3) return faults.joinToString(" · ") { it.rawName }
+    return "${faults.first().rawName} 외 ${faults.size - 1}개"
+}
+
+private enum class SeatSide {
+    LEFT,
+    CENTER,
+    RIGHT,
+}
+
+private fun compactSeatPlaces(areas: List<VehicleArea>): String? {
+    if (areas.isEmpty()) return null
+    val rows = linkedMapOf<Int, MutableSet<SeatSide>>()
+    for (area in areas) {
+        val row = area.seatRow() ?: return null
+        val side = area.seatSide() ?: return null
+        rows.getOrPut(row) { linkedSetOf() }.add(side)
+    }
+    val phrases = rows.map { (row, sides) -> row to sidePhrase(sides) }
+    val shared = phrases.map { it.second }.distinct()
+    if (shared.size == 1) {
+        return "${phrases.joinToString("·") { "${it.first}열" }} ${shared.first()}"
+    }
+    return phrases.joinToString(" · ") { (row, phrase) -> "${row}열 $phrase" }
+}
+
+private fun sidePhrase(sides: Set<SeatSide>): String {
+    val left = SeatSide.LEFT in sides
+    val center = SeatSide.CENTER in sides
+    val right = SeatSide.RIGHT in sides
+    return when {
+        left && right && center -> "전체"
+        left && right -> "양쪽"
+        left && center -> "왼쪽·가운데"
+        right && center -> "오른쪽·가운데"
+        left -> "왼쪽"
+        right -> "오른쪽"
+        center -> "가운데"
+        else -> "확인"
+    }
+}
+
+private fun VehicleArea.seatRow(): Int? = when (this) {
+    VehicleArea.ROW_1_LEFT,
+    VehicleArea.ROW_1_CENTER,
+    VehicleArea.ROW_1_RIGHT,
+    -> 1
+    VehicleArea.ROW_2_LEFT,
+    VehicleArea.ROW_2_CENTER,
+    VehicleArea.ROW_2_RIGHT,
+    -> 2
+    VehicleArea.ROW_3_LEFT,
+    VehicleArea.ROW_3_CENTER,
+    VehicleArea.ROW_3_RIGHT,
+    -> 3
+    VehicleArea.HOOD,
+    VehicleArea.TRUNK,
+    VehicleArea.FRONT_WINDSHIELD,
+    VehicleArea.REAR_WINDSHIELD,
+    VehicleArea.ROOF,
+    VehicleArea.WHEEL_LEFT_FRONT,
+    VehicleArea.WHEEL_RIGHT_FRONT,
+    VehicleArea.WHEEL_LEFT_REAR,
+    VehicleArea.WHEEL_RIGHT_REAR,
+    -> null
+}
+
+private fun VehicleArea.seatSide(): SeatSide? = when (this) {
+    VehicleArea.ROW_1_LEFT,
+    VehicleArea.ROW_2_LEFT,
+    VehicleArea.ROW_3_LEFT,
+    -> SeatSide.LEFT
+    VehicleArea.ROW_1_CENTER,
+    VehicleArea.ROW_2_CENTER,
+    VehicleArea.ROW_3_CENTER,
+    -> SeatSide.CENTER
+    VehicleArea.ROW_1_RIGHT,
+    VehicleArea.ROW_2_RIGHT,
+    VehicleArea.ROW_3_RIGHT,
+    -> SeatSide.RIGHT
+    VehicleArea.HOOD,
+    VehicleArea.TRUNK,
+    VehicleArea.FRONT_WINDSHIELD,
+    VehicleArea.REAR_WINDSHIELD,
+    VehicleArea.ROOF,
+    VehicleArea.WHEEL_LEFT_FRONT,
+    VehicleArea.WHEEL_RIGHT_FRONT,
+    VehicleArea.WHEEL_LEFT_REAR,
+    VehicleArea.WHEEL_RIGHT_REAR,
+    -> null
 }
 
 private fun isLowTire(value: Float?): Boolean {

@@ -35,21 +35,23 @@ class SummaryScreenshotTest {
     fun twoCardsNight() = shoot("summary-two-night", dark = true, count = 2)
 
     @Test
+    fun threeCardsDay() = shoot("summary-three-day", dark = false, count = 3)
+
+    @Test
+    fun threeCardsNight() = shoot("summary-three-night", dark = true, count = 3)
+
+    @Test
     fun fiveCardsDay() = shoot("summary-five-day", dark = false, count = 5)
 
     @Test
     fun fiveCardsNight() = shoot("summary-five-night", dark = true, count = 5)
 
     private fun shoot(name: String, dark: Boolean, count: Int) {
-        val unchecked = if (count == 2) {
-            listOf(
-                "워셔액: 확인할 수 없음",
-                "경고등: 이 차량에서 앱이 읽을 수 없음",
-                "주행 거리: 확인할 수 없음",
-            )
-        } else {
-            emptyList()
-        }
+        val unchecked = listOf(
+            "워셔액: 확인할 수 없음",
+            "경고등: 이 차량에서 앱이 읽을 수 없음",
+            "주행 거리: 확인할 수 없음",
+        )
         paparazzi.snapshot(name = name) {
             ParkLeaveTheme(darkTheme = dark) {
                 SummaryScreen(

@@ -35,7 +35,10 @@ fun formatDebugRows(
     rows += DebugRow("lowBeam", snapshot.lowBeamOn?.toString() ?: "null")
     rows += DebugRow("tailLamp", snapshot.tailLampOn?.toString() ?: "null")
     snapshot.seats.forEach { seat ->
-        rows += DebugRow("seat.${seat.area.name}", seat.occupied?.toString() ?: "null")
+        rows += DebugRow(
+            "seat.${seat.area.name}",
+            "occupancy=${seat.occupancy.name} belt=${seat.beltBuckled?.toString() ?: "null"}",
+        )
     }
     rows += DebugRow("hvacOn", snapshot.hvacOn?.toString() ?: "null")
     snapshot.hvacZones.forEach { zone ->

@@ -26,6 +26,7 @@ class AaosSignals(context: Context) {
     private var car: Car? = null
     private var properties: CarPropertyManager? = null
     private var restrictions: CarUxRestrictionsManager? = null
+    private var onSeatOccupancy: ((areaId: Int, raw: Int) -> Unit)? = null
 
     private val gearCallback = object : CarPropertyManager.CarPropertyEventCallback {
         override fun onChangeEvent(value: CarPropertyValue<*>) {
@@ -36,6 +37,19 @@ class AaosSignals(context: Context) {
         override fun onErrorEvent(propId: Int, area: Int) {
             if (propId != VehiclePropertyIds.GEAR_SELECTION) return
             gear.value = gear.value.copy(error = "GEAR_SELECTION onErrorEvent area=$area")
+        }
+    }
+
+    private val seatCallback = object : CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: CarPropertyValue<*>) {
+            if (value.propertyId != VehiclePropertyIds.SEAT_OCCUPANCY) return
+            val raw = value.value as? Int ?: return
+            onSeatOccupancy?.invoke(value.areaId, raw)
+        }
+
+        override fun onErrorEvent(propId: Int, area: Int) {
+            if (propId != VehiclePropertyIds.SEAT_OCCUPANCY) return
+            onSeatOccupancy?.invoke(area, SEAT_OCCUPANCY_UNKNOWN)
         }
     }
 
@@ -70,6 +84,23 @@ class AaosSignals(context: Context) {
         }
     }
 
+    fun setSeatOccupancyListener(listener: ((areaId: Int, raw: Int) -> Unit)?) {
+        onSeatOccupancy = listener
+    }
+
+    /**
+     * Raw `SEAT_OCCUPANCY` (`0x15400BB0`). 0 unknown, 1 vacant, 2 occupied.
+     * Null when the platform read is unavailable; the SDK Boolean is the fallback.
+     */
+    fun readSeatOccupancy(areaId: Int): Int? {
+        val manager = properties ?: return null
+        return try {
+            manager.getIntProperty(VehiclePropertyIds.SEAT_OCCUPANCY, areaId)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun refreshGear() {
         val manager = properties
         if (manager == null) {
@@ -87,6 +118,8 @@ class AaosSignals(context: Context) {
         try {
             @Suppress("DEPRECATION")
             properties?.unregisterCallback(gearCallback)
+            @Suppress("DEPRECATION")
+            properties?.unregisterCallback(seatCallback)
         } catch (_: Exception) {
         }
         try {
@@ -110,6 +143,7 @@ class AaosSignals(context: Context) {
         } else {
             properties = manager
             subscribeGear(manager)
+            subscribeSeatOccupancy(manager)
         }
         val ux = created.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager
         if (ux == null) {
@@ -156,6 +190,18 @@ class AaosSignals(context: Context) {
         refreshGear()
     }
 
+    private fun subscribeSeatOccupancy(manager: CarPropertyManager) {
+        try {
+            @Suppress("DEPRECATION")
+            manager.registerCallback(
+                seatCallback,
+                VehiclePropertyIds.SEAT_OCCUPANCY,
+                CarPropertyManager.SENSOR_RATE_ONCHANGE,
+            )
+        } catch (_: Exception) {
+        }
+    }
+
     private fun publishGear(value: Any?) {
         val raw = value as? Int
         gear.value = GearReading(
@@ -172,5 +218,6 @@ class AaosSignals(context: Context) {
     private companion object {
         const val CAR_CONNECT_TIMEOUT_MS = 2_000L
         const val GLOBAL_AREA = 0
+        const val SEAT_OCCUPANCY_UNKNOWN = 0
     }
 }
