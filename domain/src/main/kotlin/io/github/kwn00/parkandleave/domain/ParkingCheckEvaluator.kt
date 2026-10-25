@@ -108,7 +108,7 @@ class ParkingCheckEvaluator {
                 Severity.WARNING,
                 "타이어 저압",
                 areaDetail(low.map { it.area }, { it.label() }, ""),
-                "타이어 공기압을 점검하세요",
+                "공기압을 점검하세요",
             ),
         )
     }
@@ -136,14 +136,14 @@ class ParkingCheckEvaluator {
                 Severity.CAUTION,
                 "도어 잠금 해제",
                 areaDetail(unlocked.map { it.area }, { "${it.label()} 잠금 해제" }, ""),
-                "도어 잠금 버튼을 눌러 주세요",
+                "도어를 잠가 주세요",
             ),
         )
     }
 
     private fun MutableList<CheckItem>.addCabin(snapshot: VehicleSnapshot) {
         if (snapshot.cabinLightOn != true) return
-        add(item(SignalId.CABIN_LIGHT, Severity.CAUTION, "실내등 켜짐", "실내등이 켜져 있습니다", "실내등 스위치를 꺼 주세요"))
+        add(item(SignalId.CABIN_LIGHT, Severity.CAUTION, "실내등 켜짐", "실내등이 켜져 있습니다", "실내등을 꺼 주세요"))
     }
 
     private fun MutableList<CheckItem>.addReadingLights(snapshot: VehicleSnapshot) {
@@ -200,7 +200,7 @@ class ParkingCheckEvaluator {
             add(item(SignalId.DOOR_OPEN, Severity.WARNING, "도어 열림", "경고등 DOOR_OPEN", "도어를 닫아 주세요"))
         }
         if (active.any { it.kind == TelltaleKind.TPMS } && none { it.id == SignalId.TIRE }) {
-            add(item(SignalId.TIRE, Severity.WARNING, "타이어 저압", "경고등 TPMS", "타이어 공기압을 점검하세요"))
+            add(item(SignalId.TIRE, Severity.WARNING, "타이어 저압", "경고등 TPMS", "공기압을 점검하세요"))
         }
         if (active.any { it.kind == TelltaleKind.LOW_FUEL } && none { it.id == SignalId.LOW_FUEL }) {
             add(item(SignalId.LOW_FUEL, Severity.CAUTION, "연료 잔량 낮음", "경고등 LOW_FUEL", "연료를 보충하세요"))
