@@ -5,10 +5,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
-/** Spacing on an 8 dp grid. Half steps exist only for optical text offsets. */
+/** Spacing on an 8 dp grid. Half steps exist only for optical text offsets and tight stacks. */
 object ParkLeaveSpace {
     val half = 4.dp
     val x1 = 8.dp
+    val x1Half = 12.dp
     val x2 = 16.dp
     val x3 = 24.dp
     val x4 = 32.dp
@@ -17,18 +18,19 @@ object ParkLeaveSpace {
     val x8 = 64.dp
     val x10 = 80.dp
 
-    val paneHorizontal = x5
+    val paneHorizontal = x4
     val paneTop = x3
-    val paneBottom = x5
-    val gutter = x3
-    val cardPadding = x4
-    val panelPadding = x4
+    val paneBottom = x3
+    val gutter = x2
+    /** Leaves a four-column cell 352 dp of text, enough for every action hint on one line. */
+    val cardPadding = 20.dp
+    val panelPadding = x3
 }
 
 object ParkLeaveShapes {
     val card: Shape = RoundedCornerShape(28.dp)
     val panel: Shape = RoundedCornerShape(28.dp)
-    val tile: Shape = RoundedCornerShape(24.dp)
+    val tile: Shape = RoundedCornerShape(20.dp)
     val tileLarge: Shape = RoundedCornerShape(36.dp)
     val pill: Shape = CircleShape
 }
@@ -38,16 +40,15 @@ object ParkLeaveDimens {
     val criticalEdge = 2.dp
     val touchTarget = 64.dp
 
-    val iconTile = 80.dp
-    val icon = 48.dp
-    val hintIcon = 28.dp
-    val chipHeight = 64.dp
-    val chipIcon = 28.dp
-    val noteIcon = 28.dp
+    val iconTile = 64.dp
+    val icon = 40.dp
+    val chipHeight = 56.dp
+    val chipIcon = 26.dp
+    val noteIcon = 26.dp
 
     val headerHeight = 64.dp
     val gearPillHeight = 48.dp
-    val cardMinHeight = 368.dp
+    val cardMinHeight = 288.dp
     val heroBadge = 224.dp
     val heroBadgeIcon = 120.dp
     val statusTile = 144.dp

@@ -19,3 +19,17 @@ fun String.keepWordsTogether(): String {
     }
     return out.toString()
 }
+
+private const val NO_BREAK_SPACE = '\u00A0'
+
+/**
+ * A list such as "2열 오른쪽 점유 · 3열 오른쪽 점유" breaks only after [separator], never as
+ * "… · 3열 / 오른쪽 점유". Text without the separator falls back to [keepWordsTogether],
+ * so a single long phrase can still wrap between its words.
+ */
+fun String.keepPhrasesTogether(separator: String = " · "): String {
+    if (separator !in this) return keepWordsTogether()
+    return split(separator).joinToString(separator) { phrase ->
+        phrase.keepWordsTogether().replace(' ', NO_BREAK_SPACE)
+    }
+}

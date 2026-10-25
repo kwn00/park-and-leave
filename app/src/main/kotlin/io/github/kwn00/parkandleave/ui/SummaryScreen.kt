@@ -3,6 +3,7 @@ package io.github.kwn00.parkandleave.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -53,6 +55,7 @@ import io.github.kwn00.parkandleave.designsystem.ParkLeaveDimens
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveShapes
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveSpace
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveTheme
+import io.github.kwn00.parkandleave.designsystem.keepPhrasesTogether
 import io.github.kwn00.parkandleave.designsystem.keepWordsTogether
 import io.github.kwn00.parkandleave.domain.CardTone
 import io.github.kwn00.parkandleave.domain.CheckSession
@@ -89,7 +92,7 @@ fun SummaryScreen(
         val width = maxWidth
         Column(Modifier.fillMaxSize()) {
             SummaryHeader(state, onOpenDebug)
-            Spacer(Modifier.height(ParkLeaveSpace.x3))
+            Spacer(Modifier.height(ParkLeaveSpace.x2))
             when (state.session.phase) {
                 SessionPhase.FROZEN -> StatusMessage(
                     text = "주행 중에는 점검을 멈춥니다",
@@ -176,7 +179,7 @@ private fun GearPill(state: ParkUiState) {
                 .clip(ParkLeaveShapes.pill)
                 .background(if (parked) colors.accent else colors.onSurfaceSubtle),
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(ParkLeaveSpace.x1Half))
         Text(label, style = ParkLeaveTheme.type.gear, color = colors.onSurface, maxLines = 1)
     }
 }
@@ -209,7 +212,7 @@ private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
                 } else {
                     IssueHeadline(state, report)
                     if (state.cards.isNotEmpty()) {
-                        Spacer(Modifier.height(ParkLeaveSpace.x5))
+                        Spacer(Modifier.height(ParkLeaveSpace.x3))
                         CardGrid(state.cards, width)
                     }
                 }
@@ -224,32 +227,41 @@ private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
     val colors = ParkLeaveTheme.colors
     val type = ParkLeaveTheme.type
     val tone = headlineTone(report.allClear, state.cards)
-    Text(
-        emphasizeCount(report.headline, headlineAccent(tone, colors)),
-        style = type.headline,
-        color = colors.onSurface,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
-    report.tomorrowLine?.let { line ->
-        Spacer(Modifier.height(ParkLeaveSpace.x2))
-        Text(
-            line.keepWordsTogether(),
-            style = type.subline,
-            color = colors.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+    val context = buildList {
+        report.tomorrowLine?.let { add(it to colors.onSurface) }
+        if (state.cards.any { !it.resolved } && !state.controlAvailable) {
+            add("직접 조치하면 카드가 갱신됩니다" to colors.onSurfaceMuted)
+        }
     }
-    if (state.cards.any { !it.resolved } && !state.controlAvailable) {
-        Spacer(Modifier.height(ParkLeaveSpace.x2))
+    // Context sits beside the count, on its baseline, so two rows of cards keep the panel on screen.
+    Row(Modifier.fillMaxWidth()) {
         Text(
-            "직접 조치하면 카드가 갱신됩니다".keepWordsTogether(),
-            style = type.subline,
-            color = colors.onSurfaceMuted,
+            emphasizeCount(report.headline, headlineAccent(tone, colors)),
+            modifier = Modifier.alignBy(LastBaseline),
+            style = type.headline,
+            color = colors.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (context.isNotEmpty()) {
+            Spacer(Modifier.width(ParkLeaveSpace.x6))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .alignBy(LastBaseline),
+                verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.half),
+            ) {
+                context.forEach { (line, color) ->
+                    Text(
+                        line.keepWordsTogether(),
+                        style = type.subline,
+                        color = color,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -310,16 +322,15 @@ private fun AllClearHero(report: ParkingReport) {
 }
 
 @Composable
-private fun CardGrid(cards: List<SummaryCard>, width: Dp) {
+internal fun CardGrid(cards: List<SummaryCard>, width: Dp) {
     if (cards.isEmpty()) return
     val columns = summaryGridColumns(width.value.toInt(), cards.size).coerceAtLeast(1)
-    val gap = ParkLeaveSpace.gutter
-    val cardWidth = ((width - gap * (columns - 1)) / columns).coerceAtLeast(0.dp)
-    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+    val cardWidth = cardWidth(width, columns)
+    Column(verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.gutter)) {
         for (row in cards.chunked(columns)) {
             Row(
                 modifier = Modifier.height(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(gap),
+                horizontalArrangement = Arrangement.spacedBy(ParkLeaveSpace.gutter),
             ) {
                 for (card in row) {
                     CheckCard(card, Modifier.width(cardWidth).fillMaxHeight())
@@ -403,7 +414,7 @@ private fun CheckCard(card: SummaryCard, modifier: Modifier) {
             .padding(ParkLeaveSpace.cardPadding),
     ) {
         IconTile(look.icon, look.iconTint, look.tileColor)
-        Spacer(Modifier.height(ParkLeaveSpace.x3))
+        Spacer(Modifier.height(ParkLeaveSpace.x1Half))
         Text(
             card.title.keepWordsTogether(),
             style = type.cardTitle,
@@ -411,16 +422,16 @@ private fun CheckCard(card: SummaryCard, modifier: Modifier) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(ParkLeaveSpace.x1))
+        Spacer(Modifier.height(ParkLeaveSpace.half))
         Text(
-            card.detail.keepWordsTogether(),
+            card.detail.keepPhrasesTogether(),
             style = type.cardBody,
             color = look.detail,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (card.guidance.isNotBlank()) {
-            Spacer(Modifier.height(ParkLeaveSpace.x3))
+            Spacer(Modifier.height(ParkLeaveSpace.x1Half))
             Spacer(Modifier.weight(1f))
             ActionHint(card.guidance)
         }
@@ -440,29 +451,44 @@ private fun IconTile(icon: ParkIconKind, tint: Color, container: Color) {
     }
 }
 
+/** Width of one grid cell for [contentWidth] split into [columns]. */
+internal fun cardWidth(contentWidth: Dp, columns: Int): Dp =
+    ((contentWidth - ParkLeaveSpace.gutter * (columns - 1)) / columns).coerceAtLeast(0.dp)
+
+/** Text measure inside a card, after its padding. */
+internal fun cardTextWidth(contentWidth: Dp, columns: Int): Dp =
+    (cardWidth(contentWidth, columns) - ParkLeaveSpace.cardPadding * 2).coerceAtLeast(0.dp)
+
 private const val HINT_ARROW = "hint-arrow"
+
+/** The arrow cell includes its own gap, so no space character is spent before it. */
+internal val HintArrowPlaceholder = Placeholder(
+    width = 0.85.em,
+    height = 0.85.em,
+    placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
+)
+
+internal fun actionHintText(guidance: String): AnnotatedString = buildAnnotatedString {
+    append(guidance.keepWordsTogether())
+    appendInlineContent(HINT_ARROW, "→")
+}
 
 @Composable
 private fun ActionHint(text: String) {
     val colors = ParkLeaveTheme.colors
-    val content = buildAnnotatedString {
-        append(text.keepWordsTogether())
-        append("\u00A0")
-        appendInlineContent(HINT_ARROW, "→")
-    }
     val arrow = mapOf(
-        HINT_ARROW to InlineTextContent(
-            Placeholder(width = 0.9.em, height = 0.9.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
-        ) {
-            ParkIcon(ParkIconKind.ARROW, colors.accent, Modifier.fillMaxSize())
+        HINT_ARROW to InlineTextContent(HintArrowPlaceholder) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                ParkIcon(ParkIconKind.ARROW, colors.accent, Modifier.fillMaxHeight(0.92f).aspectRatio(1f))
+            }
         },
     )
     Text(
-        content,
+        actionHintText(text),
         inlineContent = arrow,
         style = ParkLeaveTheme.type.cardHint,
         color = colors.accent,
-        maxLines = 2,
+        maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
 }
@@ -495,24 +521,24 @@ private fun ConfirmedPanel(state: ParkUiState, top: Dp) {
     ) {
         if (state.confirmed.isNotEmpty()) {
             SectionLabel("정상으로 확인된 항목")
-            Spacer(Modifier.height(ParkLeaveSpace.x2))
+            Spacer(Modifier.height(ParkLeaveSpace.x1Half))
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(ParkLeaveSpace.x1Half),
+                verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.x1Half),
             ) {
                 state.confirmed.forEach { label -> ConfirmedChip(label) }
             }
         }
         if (note != null) {
             if (state.confirmed.isNotEmpty()) {
-                Spacer(Modifier.height(ParkLeaveSpace.x3))
+                Spacer(Modifier.height(ParkLeaveSpace.x1Half))
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .height(ParkLeaveDimens.hairline)
                         .background(colors.hairline),
                 )
-                Spacer(Modifier.height(ParkLeaveSpace.x3))
+                Spacer(Modifier.height(ParkLeaveSpace.x1Half))
             }
             UncheckedNote(note)
         }
@@ -532,7 +558,7 @@ private fun ConfirmedChip(label: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ParkIcon(ParkIconKind.CHECK, colors.ok, Modifier.size(ParkLeaveDimens.chipIcon))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(ParkLeaveSpace.x1Half))
         Text(label, style = ParkLeaveTheme.type.chip, color = colors.onSurface, maxLines = 1)
     }
 }
@@ -824,7 +850,7 @@ internal fun previewDriving(): ParkUiState = previewState(
     session = CheckSession(phase = SessionPhase.FROZEN, motionAllowed = false),
 )
 
-private fun previewState(
+internal fun previewState(
     report: ParkingReport?,
     cards: List<SummaryCard>,
     confirmed: List<String> = previewConfirmed(cards),
