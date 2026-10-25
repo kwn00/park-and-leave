@@ -49,7 +49,7 @@
 | 도어 위치 | `Door.checkDoorPositionCapabilities`, `getCurrentDoorPosition`, `registerDoorPosition` |
 | 도어 잠금 | `Door.checkDoorLockCapabilities`, `getDoorLockState`, `registerDoorLockState` |
 | 실내등, 하향등, 미등, 독서등 | `Light.check*Capabilities`, `getCurrent*`, `register*` |
-| 뒷좌석 | `Seat.checkSeatOccupancyCapabilities`, `getCurrentSeatOccupancy`, `registerSeatOccupancy` |
+| 뒷좌석 점유 | `CarPropertyManager.getIntProperty(SEAT_OCCUPANCY, area)`, SDK `Seat.checkSeatOccupancyCapabilities`, `getCurrentSeatOccupancy`, `registerSeatOccupancy` |
 | 공조 | `HVAC.checkHvacPowerCapabilities`, `getHvacPowerState`, `registerHvacPowerState` |
 | 타이어 저압 | `Tire.checkLowTirePressureCapabilities`, `getLowTirePressure` |
 | 워셔액 | `Safety.checkLowWasherFluidWarningStateCapabilities`, `hasLowWasherFluidWarning`, `registerLowWasherFluidWaringState` |
@@ -61,6 +61,8 @@
 선언한 권한은 `android.car.permission.CAR_POWERTRAIN`과 `pleos.car.permission.CAR_WINDOWS`, `CAR_DOORS`, `CAR_LIGHTS`, `CAR_SEATS`, `CAR_SAFETY`, `CAR_ENERGY`, `CAR_DRIVE`, `CAR_CLIMATE`입니다. `PRIVATE_*`와 `CONTROL_*`는 선언하지 않습니다.
 
 도어 잠금 Boolean은 SDK `setDoorLock` 설명대로 true가 잠김, false가 해제입니다. 도어 위치는 최소값 0이 닫힘이고 그보다 크면 열림입니다. 보닛과 트렁크는 위치가 열려 있거나 래치가 풀리면 각각의 열림 카드로 두고, 실내 도어 잠금 카드에는 넣지 않습니다. SOC 값이 있으면 연료는 확인할 수 없는 항목에서 뺍니다.
+
+좌석 점유는 AAOS `VehiclePropertyIds.SEAT_OCCUPANCY`(`356518832`, `0x15400BB0`)입니다. 값은 0 알 수 없음, 1 공석, 2 점유입니다. 영역 비트는 1열 왼쪽 1, 가운데 2, 오른쪽 4, 2열 왼쪽 16, 가운데 32, 오른쪽 64, 3열 왼쪽 256, 가운데 512, 오른쪽 1024이며 SDK `SeatConstant`와 같습니다. SDK 2.3.2 `getCurrentSeatOccupancy` Boolean은 원시 정수가 1일 때만 true라서 공석을 뜻하고, false는 0·2·파싱 실패를 구분하지 못합니다. 그래서 정수 읽기가 되면 그 값을 쓰고, 실패하면 Boolean true만 공석으로 둡니다. 0과 구분 못한 값은 점유가 아니라 뒷좌석 "확인할 수 없음"입니다. 카드는 2열·3열의 점유(2)만 올리고, 1열이나 운전석이 비는 것은 조건이 아닙니다. 안전벨트 `SEAT_BELT_BUCKLED`는 Boolean(`true`가 체결)이라 점유 값과 섞지 않고 디버그 행에만 둡니다. Virtual Console에서는 Emulation Controls > Convenience > Seat Occupancy에서 영역마다 이 값을 바꿉니다.
 
 ## 정차 중에만
 

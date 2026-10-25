@@ -48,7 +48,9 @@ class ParkingCheckEvaluator {
     }
 
     private fun MutableList<CheckItem>.addRearOccupancy(snapshot: VehicleSnapshot) {
-        val occupied = snapshot.seats.filter { it.occupied == true && it.area.isRearSeat() }
+        val occupied = snapshot.seats.filter {
+            it.area.isRearSeat() && it.occupancy == SeatOccupancy.OCCUPIED
+        }
         if (occupied.isEmpty()) return
         add(
             item(

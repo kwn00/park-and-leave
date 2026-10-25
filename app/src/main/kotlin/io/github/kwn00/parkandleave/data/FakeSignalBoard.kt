@@ -4,6 +4,7 @@ import io.github.kwn00.parkandleave.domain.FakePreset
 import io.github.kwn00.parkandleave.domain.FakePresets
 import io.github.kwn00.parkandleave.domain.Gear
 import io.github.kwn00.parkandleave.domain.GearReading
+import io.github.kwn00.parkandleave.domain.SeatOccupancy
 import io.github.kwn00.parkandleave.domain.TelltaleKind
 import io.github.kwn00.parkandleave.domain.VehicleArea
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
@@ -40,7 +41,11 @@ class FakeSignalBoard {
     fun clearRearSeat() = snapshot.update { current ->
         current.copy(
             seats = current.seats.map { seat ->
-                if (seat.area.isRearSeat()) seat.copy(occupied = false) else seat
+                if (seat.area.isRearSeat()) {
+                    seat.copy(occupancy = SeatOccupancy.VACANT, beltBuckled = false)
+                } else {
+                    seat
+                }
             },
         )
     }

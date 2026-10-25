@@ -84,9 +84,94 @@ class ParkingCheckEvaluatorTest {
     }
 
     @Test
+    fun aaosOccupancyOneIsVacantAndSdkBooleanTrueMatchesIt() {
+        assertEquals(SeatOccupancy.UNKNOWN, SeatOccupancy.fromAaos(0))
+        assertEquals(SeatOccupancy.VACANT, SeatOccupancy.fromAaos(1))
+        assertEquals(SeatOccupancy.OCCUPIED, SeatOccupancy.fromAaos(2))
+        assertEquals(SeatOccupancy.UNKNOWN, SeatOccupancy.fromAaos(null))
+        assertEquals(SeatOccupancy.VACANT, SeatOccupancy.fromSdkBoolean(true))
+        assertEquals(SeatOccupancy.UNKNOWN, SeatOccupancy.fromSdkBoolean(false))
+        assertEquals(SeatOccupancy.UNKNOWN, SeatOccupancy.fromSdkBoolean(null))
+        assertEquals(VehicleArea.ROW_2_CENTER, vehicleAreaForSeatId(32))
+        assertEquals(16, VehicleArea.ROW_2_LEFT.seatAreaId())
+        assertEquals(null, VehicleArea.HOOD.seatAreaId())
+    }
+
+    @Test
+    fun unknownRearSeatIsUncheckedRatherThanOccupied() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                seats = listOf(
+                    SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.UNKNOWN),
+                    SeatReading(VehicleArea.ROW_2_CENTER, SeatOccupancy.VACANT),
+                    SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.VACANT),
+                    SeatReading(VehicleArea.ROW_1_LEFT, SeatOccupancy.UNKNOWN),
+                ),
+                unread = listOf(UnreadSignal(SignalSource.SEATS, UnreadCause.NULL_VALUE)),
+            ),
+        )
+
+        assertTrue(report.items.none { it.id == SignalId.REAR_OCCUPANCY })
+        assertFalse(report.allClear)
+        assertEquals("확인된 이상 없음", report.headline)
+        assertEquals(listOf("뒷좌석: 확인할 수 없음"), report.uncheckedLines)
+    }
+
+    @Test
+    fun vacantRearSeatsStayClearWhileTheDriverIsOccupied() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                seats = listOf(
+                    SeatReading(VehicleArea.ROW_1_LEFT, SeatOccupancy.OCCUPIED),
+                    SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.VACANT),
+                    SeatReading(VehicleArea.ROW_2_CENTER, SeatOccupancy.VACANT),
+                    SeatReading(VehicleArea.ROW_2_RIGHT, SeatOccupancy.VACANT),
+                ),
+            ),
+        )
+
+        assertTrue(report.items.none { it.id == SignalId.REAR_OCCUPANCY })
+        assertTrue(report.allClear)
+    }
+
+    @Test
+    fun buckledRearBeltDoesNotReplaceOccupancy() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                seats = listOf(
+                    SeatReading(
+                        VehicleArea.ROW_2_RIGHT,
+                        SeatOccupancy.VACANT,
+                        beltBuckled = true,
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(report.items.none { it.id == SignalId.REAR_OCCUPANCY })
+        assertTrue(report.allClear)
+    }
+
+    @Test
+    fun occupiedRearSeatDoesNotRequireAVacantDriver() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                seats = listOf(
+                    SeatReading(VehicleArea.ROW_1_LEFT, SeatOccupancy.OCCUPIED),
+                    SeatReading(VehicleArea.ROW_2_CENTER, SeatOccupancy.OCCUPIED),
+                ),
+            ),
+        )
+
+        val item = report.items.single()
+        assertEquals(SignalId.REAR_OCCUPANCY, item.id)
+        assertEquals("2열 가운데 점유", item.detail)
+    }
+
+    @Test
     fun frontSeatOccupancyIsIgnored() {
         val snapshot = FakePresets.allClear().copy(
-            seats = listOf(SeatReading(VehicleArea.ROW_1_LEFT, occupied = true)),
+            seats = listOf(SeatReading(VehicleArea.ROW_1_LEFT, SeatOccupancy.OCCUPIED)),
         )
 
         assertTrue(evaluator.evaluate(snapshot).items.none { it.id == SignalId.REAR_OCCUPANCY })

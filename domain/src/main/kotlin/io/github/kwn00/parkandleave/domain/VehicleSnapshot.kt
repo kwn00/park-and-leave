@@ -52,9 +52,43 @@ data class DoorReading(
     val locked: Boolean?,
 )
 
+/**
+ * AAOS `SEAT_OCCUPANCY` (`VehiclePropertyIds` 356518832, `0x15400BB0`).
+ * 0 is unknown, 1 is vacant, 2 is occupied.
+ *
+ * Vehicle SDK 2.3.2 `SeatImpl.getCurrentSeatOccupancy` and the occupancy
+ * listener both turn that integer into a Boolean with `value == 1`. The
+ * Boolean is therefore vacant, not occupied. False also covers 0, 2, and
+ * text that is not an integer, so a Boolean false is unknown.
+ */
+enum class SeatOccupancy {
+    UNKNOWN,
+    VACANT,
+    OCCUPIED,
+    ;
+
+    companion object {
+        fun fromAaos(raw: Int?): SeatOccupancy = when (raw) {
+            AAOS_VACANT -> VACANT
+            AAOS_OCCUPIED -> OCCUPIED
+            else -> UNKNOWN
+        }
+
+        fun fromSdkBoolean(flag: Boolean?): SeatOccupancy = when (flag) {
+            true -> VACANT
+            false, null -> UNKNOWN
+        }
+
+        private const val AAOS_VACANT = 1
+        private const val AAOS_OCCUPIED = 2
+    }
+}
+
 data class SeatReading(
     val area: VehicleArea,
-    val occupied: Boolean?,
+    val occupancy: SeatOccupancy,
+    /** `getCurrentSeatBeltBuckledState`: true means buckled. Null means unread. */
+    val beltBuckled: Boolean? = null,
 )
 
 data class ReadingLightReading(
@@ -131,6 +165,42 @@ fun VehicleArea.label(): String = when (this) {
     VehicleArea.WHEEL_RIGHT_FRONT -> "앞 오른쪽 타이어"
     VehicleArea.WHEEL_LEFT_REAR -> "뒤 왼쪽 타이어"
     VehicleArea.WHEEL_RIGHT_REAR -> "뒤 오른쪽 타이어"
+}
+
+/** SDK `SeatConstant` and AAOS `VehicleAreaSeat` use the same bit values. */
+fun VehicleArea.seatAreaId(): Int? = when (this) {
+    VehicleArea.ROW_1_LEFT -> 1
+    VehicleArea.ROW_1_CENTER -> 2
+    VehicleArea.ROW_1_RIGHT -> 4
+    VehicleArea.ROW_2_LEFT -> 16
+    VehicleArea.ROW_2_CENTER -> 32
+    VehicleArea.ROW_2_RIGHT -> 64
+    VehicleArea.ROW_3_LEFT -> 256
+    VehicleArea.ROW_3_CENTER -> 512
+    VehicleArea.ROW_3_RIGHT -> 1024
+    VehicleArea.HOOD,
+    VehicleArea.TRUNK,
+    VehicleArea.FRONT_WINDSHIELD,
+    VehicleArea.REAR_WINDSHIELD,
+    VehicleArea.ROOF,
+    VehicleArea.WHEEL_LEFT_FRONT,
+    VehicleArea.WHEEL_RIGHT_FRONT,
+    VehicleArea.WHEEL_LEFT_REAR,
+    VehicleArea.WHEEL_RIGHT_REAR,
+    -> null
+}
+
+fun vehicleAreaForSeatId(id: Int): VehicleArea? = when (id) {
+    1 -> VehicleArea.ROW_1_LEFT
+    2 -> VehicleArea.ROW_1_CENTER
+    4 -> VehicleArea.ROW_1_RIGHT
+    16 -> VehicleArea.ROW_2_LEFT
+    32 -> VehicleArea.ROW_2_CENTER
+    64 -> VehicleArea.ROW_2_RIGHT
+    256 -> VehicleArea.ROW_3_LEFT
+    512 -> VehicleArea.ROW_3_CENTER
+    1024 -> VehicleArea.ROW_3_RIGHT
+    else -> null
 }
 
 fun VehicleArea.isRearSeat(): Boolean = when (this) {

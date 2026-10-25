@@ -51,7 +51,7 @@ class SummaryBoardTest {
     fun activeCardsKeepSeverityOrderAndAreNotResolved() {
         val report = evaluator.evaluate(
             FakePresets.allClear().copy(
-                seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, occupied = true)),
+                seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED)),
                 hvacOn = true,
             ),
         )
