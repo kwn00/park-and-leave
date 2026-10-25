@@ -48,7 +48,7 @@ class SummaryBoardTest {
     fun activeCardsKeepSeverityOrderAndAreNotResolved() {
         val report = evaluator.evaluate(
             FakePresets.allClear().copy(
-                seats = listOf(SeatReading(VehicleArea.ROW_2_LEFT, SeatOccupancy.OCCUPIED)),
+                doors = FakePresets.allClear().doors + DoorReading(VehicleArea.TRUNK, position = 1, locked = true),
                 hvacOn = true,
             ),
         )
@@ -57,7 +57,7 @@ class SummaryBoardTest {
         assertTrue(cards.any { it.tone == CardTone.WARN })
         assertTrue(cards.none { it.resolved })
         assertEquals(report.items.map { it.id }, cards.map { it.id })
-        assertEquals("뒷좌석을 확인하세요", cards.first().guidance)
+        assertEquals("트렁크를 닫아 주세요", cards.first().guidance)
         assertEquals(HeadlineTone.CRITICAL, headlineTone(report.allClear, cards))
     }
 
@@ -167,7 +167,6 @@ class SummaryBoardTest {
                 "실내등",
                 "독서등",
                 "외부등",
-                "뒷좌석",
                 "공조",
                 "타이어",
                 "워셔액",
@@ -179,16 +178,15 @@ class SummaryBoardTest {
     }
 
     @Test
-    fun openWindowAndOccupiedRearDropThoseChips() {
+    fun openWindowAndOpenTrunkDropThoseChips() {
         val windows = confirmedLabels(FakePresets.windowAndReading(), emptySet())
         assertFalse(windows.contains("창문"))
         assertFalse(windows.contains("독서등"))
         assertTrue(windows.contains("실내등"))
 
-        val rear = FakePresets.rearSeatAndTrunk()
-        val openIds = evaluator.evaluate(rear).items.map { it.id }.toSet()
-        val labels = confirmedLabels(rear, openIds)
-        assertFalse(labels.contains("뒷좌석"))
+        val trunk = FakePresets.trunkOpen()
+        val openIds = evaluator.evaluate(trunk).items.map { it.id }.toSet()
+        val labels = confirmedLabels(trunk, openIds)
         assertFalse(labels.contains("트렁크"))
         assertFalse(labels.contains("경고등"))
         assertTrue(labels.contains("창문"))
@@ -215,18 +213,7 @@ class SummaryBoardTest {
     }
 
     @Test
-    fun beltAndCardIdsDoNotInventAFineChip() {
-        val belted = FakePresets.allClear().copy(
-            seats = listOf(
-                SeatReading(
-                    VehicleArea.ROW_2_RIGHT,
-                    SeatOccupancy.VACANT,
-                    beltBuckled = false,
-                ),
-            ),
-        )
-        assertTrue(confirmedLabels(belted, emptySet()).contains("뒷좌석"))
-
+    fun cardIdsDoNotInventAFineChip() {
         val openHood = FakePresets.allClear().copy(
             doors = FakePresets.allClear().doors + DoorReading(
                 VehicleArea.HOOD,

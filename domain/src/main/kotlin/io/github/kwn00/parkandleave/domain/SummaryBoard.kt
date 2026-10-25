@@ -132,7 +132,6 @@ fun confirmedLabels(snapshot: VehicleSnapshot, cardIds: Set<SignalId>): List<Str
         )
         addConfirmed(cardIds, SignalId.READING_LIGHT, "독서등", readingLightsConfirmed(snapshot))
         addConfirmed(cardIds, SignalId.EXTERIOR_LIGHT, "외부등", exteriorConfirmed(snapshot))
-        addConfirmed(cardIds, SignalId.REAR_OCCUPANCY, "뒷좌석", rearSeatsConfirmed(snapshot))
         addConfirmed(
             cardIds,
             SignalId.HVAC,
@@ -199,12 +198,6 @@ private fun exteriorConfirmed(snapshot: VehicleSnapshot): Boolean {
     if (snapshot.lowBeamOn == null && snapshot.tailLampOn == null) return false
     if (snapshot.missed(SignalSource.LOW_BEAM) || snapshot.missed(SignalSource.TAIL_LAMP)) return false
     return snapshot.lowBeamOn != true && snapshot.tailLampOn != true
-}
-
-private fun rearSeatsConfirmed(snapshot: VehicleSnapshot): Boolean {
-    if (snapshot.missed(SignalSource.SEATS)) return false
-    val rear = snapshot.seats.filter { it.area.isRearSeat() }
-    return rear.isNotEmpty() && rear.all { it.occupancy == SeatOccupancy.VACANT }
 }
 
 private fun tiresConfirmed(snapshot: VehicleSnapshot): Boolean {
