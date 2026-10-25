@@ -12,14 +12,19 @@ import io.github.kwn00.parkandleave.domain.DebugRow
 import io.github.kwn00.parkandleave.domain.FakePreset
 import io.github.kwn00.parkandleave.domain.Gear
 import io.github.kwn00.parkandleave.domain.GearReading
+import io.github.kwn00.parkandleave.domain.ParkCursor
+import io.github.kwn00.parkandleave.domain.ParkFrame
 import io.github.kwn00.parkandleave.domain.ParkingCheckEvaluator
 import io.github.kwn00.parkandleave.domain.ParkingReport
+import io.github.kwn00.parkandleave.domain.SdkLink
 import io.github.kwn00.parkandleave.domain.SeenIssue
 import io.github.kwn00.parkandleave.domain.SessionPhase
 import io.github.kwn00.parkandleave.domain.SummaryCard
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.checkSession
 import io.github.kwn00.parkandleave.domain.formatDebugRows
+import io.github.kwn00.parkandleave.domain.reducePark
+import io.github.kwn00.parkandleave.domain.reportFor
 import io.github.kwn00.parkandleave.domain.seenForSession
 import io.github.kwn00.parkandleave.domain.summaryCards
 import io.github.kwn00.parkandleave.future.DefaultPlaceProfileSource
@@ -56,6 +61,7 @@ private data class VehicleSide(
     val restricted: Boolean,
     val liveStatus: String,
     val vehicleStatus: String,
+    val link: SdkLink,
 )
 
 data class ParkUiState(
@@ -110,18 +116,31 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
         combine(origin, screen, manual, selectedGear) { selectedOrigin, selectedScreen, manualRequested, gear ->
             Selection(selectedOrigin, selectedScreen, manualRequested, gear)
         },
-        combine(selectedSnapshot, aaos.restricted, aaos.status, vehicle.status) { snapshot, restricted, liveStatus, vehicleStatus ->
-            VehicleSide(snapshot, restricted, liveStatus, vehicleStatus)
+        combine(
+            selectedSnapshot,
+            aaos.restricted,
+            aaos.status,
+            vehicle.status,
+            vehicle.link,
+        ) { snapshot, restricted, liveStatus, vehicleStatus, link ->
+            VehicleSide(snapshot, restricted, liveStatus, vehicleStatus, link)
         },
         seen,
     ) { selection, vehicleSide, seenIssues ->
         val restricted = selection.origin == DataOrigin.LIVE && vehicleSide.restricted
+        val link = if (selection.origin == DataOrigin.LIVE) vehicleSide.link else SdkLink.CONNECTED
         val session = checkSession(selection.gear.gear, restricted, selection.manual)
-        val report = if (vehicleSide.snapshot.ready && session.phase == SessionPhase.ACTIVE) {
-            evaluator.evaluate(vehicleSide.snapshot)
-        } else {
-            null
-        }
+        val report = reportFor(
+            session,
+            ParkFrame(
+                gear = selection.gear.gear,
+                restricted = restricted,
+                manual = selection.manual,
+                link = link,
+                snapshot = vehicleSide.snapshot,
+            ),
+            evaluator,
+        )
         val originLabel = when (selection.origin) {
             DataOrigin.LIVE -> "실측"
             DataOrigin.FAKE -> "모의"
@@ -133,7 +152,9 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             snapshot = vehicleSide.snapshot,
             session = session,
             report = report,
-            scanning = session.phase == SessionPhase.ACTIVE && !vehicleSide.snapshot.ready,
+            scanning = session.phase == SessionPhase.ACTIVE &&
+                !vehicleSide.snapshot.ready &&
+                link == SdkLink.CONNECTED,
             showManualCheck = session.phase == SessionPhase.IDLE && selection.gear.gear == Gear.UNKNOWN,
             debugRows = formatDebugRows(originLabel, selection.gear, vehicleSide.snapshot),
             liveStatus = vehicleSide.liveStatus,
@@ -156,6 +177,27 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         aaos.start()
         vehicle.start()
+        viewModelScope.launch {
+            var previous = ParkCursor(gear = Gear.UNKNOWN, link = SdkLink.NOT_CONNECTED)
+            combine(selectedGear, vehicle.link, origin) { gear, sdkLink, selected ->
+                Triple(gear, sdkLink, selected)
+            }.collect { (gear, sdkLink, selected) ->
+                val frameLink = if (selected == DataOrigin.LIVE) sdkLink else SdkLink.CONNECTED
+                val frame = ParkFrame(
+                    gear = gear.gear,
+                    restricted = selected == DataOrigin.LIVE && aaos.restricted.value,
+                    manual = manual.value,
+                    link = frameLink,
+                    snapshot = selectedSnapshot.value,
+                )
+                val reduction = reducePark(previous, seen.value, frame, evaluator)
+                previous = ParkCursor(gear.gear, frameLink)
+                if (reduction.reread && selected == DataOrigin.LIVE) {
+                    aaos.refreshGear()
+                    vehicle.refresh()
+                }
+            }
+        }
         viewModelScope.launch {
             state.collect { ui ->
                 val nextSeen = seenForSession(ui.session.phase, seen.value, ui.report)

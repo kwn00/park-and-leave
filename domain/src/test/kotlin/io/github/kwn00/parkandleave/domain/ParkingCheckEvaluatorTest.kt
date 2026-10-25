@@ -114,6 +114,66 @@ class ParkingCheckEvaluatorTest {
     }
 
     @Test
+    fun releasedHoodLatchIsItsOwnOpenCard() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(
+                    DoorReading(VehicleArea.ROW_1_LEFT, position = 0, locked = true),
+                    DoorReading(VehicleArea.HOOD, position = 0, locked = false),
+                ),
+            ),
+        )
+
+        val hood = report.items.single { it.id == SignalId.HOOD }
+        assertEquals("보닛 열림", hood.title)
+        assertEquals(Severity.WARNING, hood.severity)
+        assertTrue(report.items.none { it.id == SignalId.DOOR_UNLOCKED || it.id == SignalId.DOOR_OPEN })
+    }
+
+    @Test
+    fun hoodPositionOpenStaysOffTheDoorCard() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(DoorReading(VehicleArea.HOOD, position = 1, locked = true)),
+            ),
+        )
+
+        assertEquals(listOf(SignalId.HOOD), report.items.map { it.id })
+        assertEquals("보닛 열림", report.items.single().title)
+    }
+
+    @Test
+    fun closedLockedHoodIsClear() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(DoorReading(VehicleArea.HOOD, position = 0, locked = true)),
+            ),
+        )
+
+        assertTrue(report.items.none { it.id == SignalId.HOOD || it.id == SignalId.DOOR_UNLOCKED })
+    }
+
+    @Test
+    fun releasedTrunkLatchIsTrunkOpenNotADoorLock() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                doors = listOf(
+                    DoorReading(VehicleArea.ROW_1_LEFT, position = 0, locked = false),
+                    DoorReading(VehicleArea.TRUNK, position = 0, locked = false),
+                    DoorReading(VehicleArea.HOOD, position = 0, locked = false),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(SignalId.TRUNK, SignalId.HOOD, SignalId.DOOR_UNLOCKED),
+            report.items.map { it.id },
+        )
+        assertEquals("트렁크 열림", report.items.first { it.id == SignalId.TRUNK }.title)
+        assertEquals("1열 왼쪽 잠금 해제", report.items.first { it.id == SignalId.DOOR_UNLOCKED }.detail)
+    }
+
+    @Test
     fun cabinExteriorAndHvacFlags() {
         val snapshot = FakePresets.allClear().copy(
             cabinLightOn = true,
@@ -193,6 +253,43 @@ class ParkingCheckEvaluatorTest {
     }
 
     @Test
+    fun reportedSocDropsUnreadFuelFromTheCompactNote() {
+        val withSoc = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                socPercent = 70,
+                fuelPercent = null,
+                unread = listOf(
+                    UnreadSignal(SignalSource.WASHER, UnreadCause.NULL_VALUE),
+                    UnreadSignal(SignalSource.TELLTALES, UnreadCause.PERMISSION),
+                    UnreadSignal(SignalSource.FUEL, UnreadCause.NULL_VALUE),
+                    UnreadSignal(SignalSource.TRIP, UnreadCause.NULL_VALUE),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf("워셔액: 확인할 수 없음", "경고등: 이 차량에서 앱이 읽을 수 없음", "주행 거리: 확인할 수 없음"),
+            withSoc.uncheckedLines,
+        )
+        assertEquals(
+            "확인할 수 없는 항목: 워셔액, 경고등, 주행 거리",
+            uncheckedNote(withSoc.uncheckedLines),
+        )
+        assertFalse(withSoc.allClear)
+        assertEquals("확인된 이상 없음", withSoc.headline)
+
+        val withoutSoc = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                socPercent = null,
+                fuelPercent = null,
+                unread = listOf(UnreadSignal(SignalSource.FUEL, UnreadCause.NULL_VALUE)),
+            ),
+        )
+        assertEquals(listOf("연료: 확인할 수 없음"), withoutSoc.uncheckedLines)
+        assertFalse(withoutSoc.allClear)
+    }
+
+    @Test
     fun telltaleFaultsMapWithoutDuplicatingDirectSignals() {
         val both = evaluator.evaluate(
             VehicleSnapshot(
@@ -230,6 +327,85 @@ class ParkingCheckEvaluatorTest {
             ),
         )
         assertTrue(report.allClear)
+    }
+
+    @Test
+    fun telltalePermissionDoesNotBlockAllClear() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                unread = listOf(UnreadSignal(SignalSource.TELLTALES, UnreadCause.PERMISSION)),
+                readErrors = listOf("경고등: getTelltalesInfo need Permission"),
+            ),
+        )
+
+        assertTrue(report.allClear)
+        assertEquals("모두 정상", report.headline)
+        assertEquals("내려도 됩니다", report.clearanceLine)
+        assertEquals(listOf("경고등: 이 차량에서 앱이 읽을 수 없음"), report.uncheckedLines)
+    }
+
+    @Test
+    fun telltalePermissionDoesNotHideAnotherSource() {
+        val report = evaluator.evaluate(
+            FakePresets.windowAndReading().copy(
+                unread = listOf(UnreadSignal(SignalSource.TELLTALES, UnreadCause.PERMISSION)),
+            ),
+        )
+
+        assertFalse(report.allClear)
+        assertEquals("확인 2건", report.headline)
+        assertTrue(report.items.any { it.id == SignalId.WINDOW })
+        assertTrue(report.items.any { it.id == SignalId.READING_LIGHT })
+        assertEquals(listOf("경고등: 이 차량에서 앱이 읽을 수 없음"), report.uncheckedLines)
+    }
+
+    @Test
+    fun nullPropertyIsUncheckedRatherThanNormal() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                cabinLightOn = null,
+                unread = listOf(UnreadSignal(SignalSource.CABIN_LIGHT, UnreadCause.NULL_VALUE)),
+            ),
+        )
+
+        assertFalse(report.allClear)
+        assertEquals("확인된 이상 없음", report.headline)
+        assertNull(report.clearanceLine)
+        assertTrue(report.items.none { it.id == SignalId.CABIN_LIGHT })
+        assertEquals(listOf("실내등: 확인할 수 없음"), report.uncheckedLines)
+    }
+
+    @Test
+    fun absentFieldWithoutUnreadMarkerStaysOutOfTheReport() {
+        val report = evaluator.evaluate(
+            VehicleSnapshot(cabinLightOn = null, ready = true),
+        )
+
+        assertTrue(report.allClear)
+        assertTrue(report.uncheckedLines.isEmpty())
+    }
+
+    @Test
+    fun telltaleTimeoutStillBlocksClear() {
+        val report = evaluator.evaluate(
+            FakePresets.allClear().copy(
+                unread = listOf(UnreadSignal(SignalSource.TELLTALES, UnreadCause.FAILED)),
+            ),
+        )
+
+        assertFalse(report.allClear)
+        assertEquals("확인된 이상 없음", report.headline)
+        assertEquals(listOf("경고등: 확인할 수 없음"), report.uncheckedLines)
+    }
+
+    @Test
+    fun disconnectedLinkIsOneUncheckedLine() {
+        val report = evaluator.evaluate(
+            VehicleSnapshot(ready = true, link = SdkLink.DISCONNECTED),
+        )
+
+        assertFalse(report.allClear)
+        assertEquals(listOf("차량 서비스: 연결되지 않음"), report.uncheckedLines)
     }
 
     @Test

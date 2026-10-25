@@ -12,6 +12,7 @@ class ParkingCheckEvaluator {
         val items = buildList {
             addRearOccupancy(snapshot)
             addTrunk(snapshot)
+            addHood(snapshot)
             addOpenDoors(snapshot)
             addTire(snapshot)
             addWindows(snapshot)
@@ -26,10 +27,13 @@ class ParkingCheckEvaluator {
             addMappedTelltales(snapshot)
         }.sortedWith(compareBy<CheckItem> { it.severity.ordinal }.thenBy { it.id.ordinal })
 
-        val allClear = items.isEmpty() && snapshot.readErrors.isEmpty()
+        val unread = visibleUnread(snapshot)
+        val blocked = unread.any { it.blocksClear() } ||
+            (snapshot.unread.isEmpty() && snapshot.link == SdkLink.CONNECTED && snapshot.readErrors.isNotEmpty())
+        val allClear = items.isEmpty() && !blocked
         val headline = when {
             items.isNotEmpty() -> "확인 ${items.size}건"
-            snapshot.readErrors.isNotEmpty() -> "확인된 이상 없음"
+            !allClear -> "확인된 이상 없음"
             else -> "모두 정상"
         }
         return ParkingReport(
@@ -39,6 +43,7 @@ class ParkingCheckEvaluator {
             tomorrowLine = tomorrowLine(snapshot, items),
             clearanceLine = if (allClear) "내려도 됩니다" else null,
             speechLine = speechLine(items),
+            uncheckedLines = unread.map { it.line() },
         )
     }
 
@@ -56,14 +61,30 @@ class ParkingCheckEvaluator {
         )
     }
 
+    /**
+     * Hood and trunk are closures, not cabin door locks.
+     *
+     * Vehicle SDK 2.3.2 `Door.setDoorPosition` says the minimum is typically 0
+     * for fully closed, and a higher value is open. `Door.setDoorLock` says
+     * true locks and false unlocks. Cabin doors keep that split.
+     *
+     * An open frunk on the contest vehicle arrives as HOOD `DOOR_LOCK` = false
+     * while `DOOR_POS` stays 0, and the system UI asks to close the frunk.
+     * A released hood or trunk latch is therefore its own open card and is
+     * never mixed into "도어 잠금 해제" or "도어 열림".
+     */
     private fun MutableList<CheckItem>.addTrunk(snapshot: VehicleSnapshot) {
-        val open = snapshot.doors.any { it.area == VehicleArea.TRUNK && (it.position ?: 0) > 0 }
-        if (!open) return
+        if (snapshot.doors.none { it.area == VehicleArea.TRUNK && it.isOpenClosure() }) return
         add(item(SignalId.TRUNK, Severity.WARNING, "트렁크 열림", "트렁크가 열려 있습니다", "트렁크를 닫아 주세요"))
     }
 
+    private fun MutableList<CheckItem>.addHood(snapshot: VehicleSnapshot) {
+        if (snapshot.doors.none { it.area == VehicleArea.HOOD && it.isOpenClosure() }) return
+        add(item(SignalId.HOOD, Severity.WARNING, "보닛 열림", "보닛이 열려 있습니다", "보닛을 닫아 주세요"))
+    }
+
     private fun MutableList<CheckItem>.addOpenDoors(snapshot: VehicleSnapshot) {
-        val open = snapshot.doors.filter { it.area != VehicleArea.TRUNK && (it.position ?: 0) > 0 }
+        val open = snapshot.doors.filter { !it.area.isClosure() && (it.position ?: 0) > 0 }
         if (open.isEmpty()) return
         add(
             item(
@@ -105,7 +126,7 @@ class ParkingCheckEvaluator {
     }
 
     private fun MutableList<CheckItem>.addUnlocked(snapshot: VehicleSnapshot) {
-        val unlocked = snapshot.doors.filter { it.locked == false }
+        val unlocked = snapshot.doors.filter { !it.area.isClosure() && it.locked == false }
         if (unlocked.isEmpty()) return
         add(
             item(
@@ -198,6 +219,47 @@ class ParkingCheckEvaluator {
             )
         }
     }
+}
+
+/**
+ * A disconnected service is one unchecked line. Structured [VehicleSnapshot.unread]
+ * entries are the source of truth. Legacy [VehicleSnapshot.readErrors] strings
+ * still block "모두 정상" only when no structured entry explains them.
+ */
+private fun visibleUnread(snapshot: VehicleSnapshot): List<UnreadSignal> {
+    val recorded = snapshot.unread.distinctBy { it.source }.toMutableList()
+    if (snapshot.socPercent != null) {
+        recorded.removeAll { it.source == SignalSource.FUEL }
+    }
+    if (snapshot.link != SdkLink.CONNECTED && recorded.none { it.source == SignalSource.VEHICLE_SERVICE }) {
+        recorded += UnreadSignal(SignalSource.VEHICLE_SERVICE, UnreadCause.DISCONNECTED)
+    }
+    return recorded.sortedBy { it.source.ordinal }
+}
+
+private fun DoorReading.isOpenClosure(): Boolean = (position ?: 0) > 0 || locked == false
+
+private fun VehicleArea.isClosure(): Boolean = when (this) {
+    VehicleArea.HOOD,
+    VehicleArea.TRUNK,
+    -> true
+    VehicleArea.ROW_1_LEFT,
+    VehicleArea.ROW_1_CENTER,
+    VehicleArea.ROW_1_RIGHT,
+    VehicleArea.ROW_2_LEFT,
+    VehicleArea.ROW_2_CENTER,
+    VehicleArea.ROW_2_RIGHT,
+    VehicleArea.ROW_3_LEFT,
+    VehicleArea.ROW_3_CENTER,
+    VehicleArea.ROW_3_RIGHT,
+    VehicleArea.FRONT_WINDSHIELD,
+    VehicleArea.REAR_WINDSHIELD,
+    VehicleArea.ROOF,
+    VehicleArea.WHEEL_LEFT_FRONT,
+    VehicleArea.WHEEL_RIGHT_FRONT,
+    VehicleArea.WHEEL_LEFT_REAR,
+    VehicleArea.WHEEL_RIGHT_REAR,
+    -> false
 }
 
 private fun item(

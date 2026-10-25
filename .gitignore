@@ -7,6 +7,9 @@ captures/
 *.apk
 *.ap_
 *.aab
+*.jks
+*.keystore
+!apk/*.apk
 .DS_Store
 .externalNativeBuild/
 .cxx/

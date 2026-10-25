@@ -16,6 +16,7 @@ import io.github.kwn00.parkandleave.domain.SignalId
 enum class GlyphKind {
     OCCUPANT,
     TRUNK,
+    HOOD,
     DOOR,
     TIRE,
     ALERT,
@@ -34,6 +35,7 @@ enum class GlyphKind {
 fun glyphFor(id: SignalId): GlyphKind = when (id) {
     SignalId.REAR_OCCUPANCY -> GlyphKind.OCCUPANT
     SignalId.TRUNK -> GlyphKind.TRUNK
+    SignalId.HOOD -> GlyphKind.HOOD
     SignalId.DOOR_OPEN -> GlyphKind.DOOR
     SignalId.TIRE -> GlyphKind.TIRE
     SignalId.TELLTALE -> GlyphKind.ALERT
@@ -55,6 +57,7 @@ fun StatusGlyph(kind: GlyphKind, tint: Color, modifier: Modifier = Modifier) {
         when (kind) {
             GlyphKind.OCCUPANT -> drawOccupant(tint, stroke)
             GlyphKind.TRUNK -> drawTrunk(tint, stroke)
+            GlyphKind.HOOD -> drawHood(tint, stroke)
             GlyphKind.DOOR -> drawDoor(tint, stroke)
             GlyphKind.TIRE -> drawTire(tint, stroke)
             GlyphKind.ALERT -> drawAlert(tint, stroke)
@@ -99,6 +102,21 @@ private fun DrawScope.drawTrunk(tint: Color, stroke: Stroke) {
     )
     drawLine(tint, Offset(w * 0.2f, h * 0.42f), Offset(w * 0.32f, h * 0.22f), stroke.width, StrokeCap.Round)
     drawLine(tint, Offset(w * 0.32f, h * 0.22f), Offset(w * 0.78f, h * 0.22f), stroke.width, StrokeCap.Round)
+}
+
+private fun DrawScope.drawHood(tint: Color, stroke: Stroke) {
+    val w = size.width
+    val h = size.height
+    drawRoundRect(
+        tint,
+        topLeft = Offset(w * 0.16f, h * 0.5f),
+        size = Size(w * 0.68f, h * 0.28f),
+        cornerRadius = CornerRadius(w * 0.04f),
+        style = stroke,
+    )
+    drawLine(tint, Offset(w * 0.2f, h * 0.5f), Offset(w * 0.32f, h * 0.2f), stroke.width, StrokeCap.Round)
+    drawLine(tint, Offset(w * 0.32f, h * 0.2f), Offset(w * 0.74f, h * 0.28f), stroke.width, StrokeCap.Round)
+    drawLine(tint, Offset(w * 0.74f, h * 0.28f), Offset(w * 0.8f, h * 0.5f), stroke.width, StrokeCap.Round)
 }
 
 private fun DrawScope.drawDoor(tint: Color, stroke: Stroke) {

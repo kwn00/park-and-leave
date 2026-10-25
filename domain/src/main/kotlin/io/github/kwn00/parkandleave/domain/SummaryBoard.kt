@@ -34,9 +34,28 @@ fun Severity.toCardTone(): CardTone = when (this) {
     Severity.CAUTION -> CardTone.WARN
 }
 
+enum class SummaryLayout {
+    /** One card, centered, with a bounded size. */
+    SPOTLIGHT,
+
+    /** Two or three cards in a single row. */
+    ROW,
+
+    /** Four or more cards, up to four columns. */
+    GRID,
+}
+
+/** 1 card is a spotlight, 2–3 stay on one row, and the rest use the column grid. */
+fun summaryLayout(cardCount: Int): SummaryLayout = when {
+    cardCount <= 1 -> SummaryLayout.SPOTLIGHT
+    cardCount <= 3 -> SummaryLayout.ROW
+    else -> SummaryLayout.GRID
+}
+
 /**
  * How many equal columns the summary grid should use for this window.
- * Fewer cards than the fit still span the width, one card per column.
+ * Used when [summaryLayout] is [SummaryLayout.GRID]. Fewer cards than the fit
+ * still share the row horizontally. Cards do not grow to the screen height.
  */
 fun summaryGridColumns(widthDp: Int, cardCount: Int): Int {
     if (cardCount <= 1) return 1

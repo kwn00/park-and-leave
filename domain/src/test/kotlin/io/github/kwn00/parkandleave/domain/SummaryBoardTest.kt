@@ -9,6 +9,16 @@ class SummaryBoardTest {
     private val evaluator = ParkingCheckEvaluator()
 
     @Test
+    fun oneCardIsSpotlightTwoOrThreeAreOneRow() {
+        assertEquals(SummaryLayout.SPOTLIGHT, summaryLayout(0))
+        assertEquals(SummaryLayout.SPOTLIGHT, summaryLayout(1))
+        assertEquals(SummaryLayout.ROW, summaryLayout(2))
+        assertEquals(SummaryLayout.ROW, summaryLayout(3))
+        assertEquals(SummaryLayout.GRID, summaryLayout(4))
+        assertEquals(SummaryLayout.GRID, summaryLayout(5))
+    }
+
+    @Test
     fun wideWindowUsesFourColumnsWhenThereAreEnoughCards() {
         assertEquals(4, summaryGridColumns(widthDp = 1682, cardCount = 6))
         assertEquals(4, summaryGridColumns(widthDp = 1500, cardCount = 4))

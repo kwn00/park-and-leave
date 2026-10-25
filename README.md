@@ -1,16 +1,79 @@
 # Park & Leave
 
-기어를 P로 바꾸는 순간 창문, 도어, 조명, 뒷좌석, 공조, 타이어, 워셔액, 경고등, 잔여 에너지를 한 화면으로 모아 "모두 정상" 또는 "확인 n건"으로 보여 주는 정차 전용 앱입니다. 항목이 해결되면 그 카드는 해결 상태로 남고, 정차가 끝나면 지워집니다.
+기어를 P로 두는 순간 창문, 도어 잠금, 보닛·트렁크, 실내등·외부등, 뒷좌석, 공조, 타이어, 워셔액, 배터리, 연료를 한 번 읽고, 내릴 때 볼 항목만 카드로 모읍니다. 읽을 수 있는 값이 모두 정상이면 "모두 정상 / 내려도 됩니다"를 보여주고, 앱이 확인하지 못한 신호는 "확인할 수 없는 항목: …" 한 줄로 남깁니다. SOC가 있으면 그 줄에서 연료는 뺍니다. 정차가 아니면 점검 화면을 열지 않습니다.
 
-## 빌드
+## 기능
 
-- JDK 17 이상
+- P에 들어가면 차량 상태를 한 번 읽고, P를 벗어났다가 다시 들어오면 다시 읽습니다.
+- 확인 카드는 창문, 도어, 잠금, 보닛, 트렁크, 조명, 뒷좌석, 공조, 타이어, 워셔액, 배터리, 연료, 읽을 수 있는 경고등입니다. 보닛과 트렁크는 도어 잠금에 섞지 않고 "보닛 열림", "트렁크 열림"으로 둡니다.
+- 이번 정차에서 해결된 항목은 "해결됨"으로 남고, 정차가 끝나면 지워집니다.
+- 카드 수에 따라 배치가 바뀝니다. 1장이면 가운데 큰 카드, 2–3장이면 한 줄, 그 이상이면 최대 4열입니다. 카드는 화면 높이를 채우지 않습니다.
+- 신호마다 실패를 따로 처리합니다. 한 항목의 `SecurityException`이나 미제공이 다른 항목을 지우지 않습니다.
+- 값이 null이면 정상으로 세지 않고 "확인할 수 없음"으로 둡니다.
+- 차량 서비스가 연결되지 않았거나 끊기면 카드를 정상으로 두지 않고 "차량 서비스: 연결되지 않음"을 보여 줍니다.
+- 주간과 야간 색을 시스템 설정에 맞춥니다.
+
+## 화면
+
+에뮬레이터에서 앱이 차지하는 넓은 영역을 기준으로 한 화면입니다.
+
+한 장일 때 카드는 가운데에 있고, 아이콘과 제목이 더 큽니다.
+
+![확인 1건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardDay_summary-one-day.png)
+
+![확인 1건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_oneCardNight_summary-one-night.png)
+
+두 장은 한 줄입니다.
+
+![확인 2건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsDay_summary-two-day.png)
+
+![확인 2건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_twoCardsNight_summary-two-night.png)
+
+다섯 장은 최대 4열 격자입니다.
+
+![확인 5건, 주간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_fiveCardsDay_summary-five-day.png)
+
+![확인 5건, 야간](app/src/test/snapshots/images/io.github.kwn00.parkandleave.ui_SummaryScreenshotTest_fiveCardsNight_summary-five-night.png)
+
+## 사용하는 API
+
+기어는 Vehicle SDK `Gear` API를 쓰지 않습니다. SDK 2.3.2 `Gear` KDoc은 `getCurrentGearSelectionState`와 `registerGearSelection`을 deprecated로 두고, 플랫폼 `GEAR_SELECTION` 프로퍼티를 쓰라고 합니다. 이 앱은 AAOS `CarPropertyManager`로 `VehiclePropertyIds.GEAR_SELECTION`(`289408000`)을 읽습니다. P는 4, R은 2, N은 1, D는 8입니다.
+
+나머지 조회는 `ai.pleos.playground:Vehicle:2.3.2`입니다. capability에서 읽기가 없으면 그 항목은 숨깁니다.
+
+| 화면 항목 | 호출 |
+|---|---|
+| 기어 | `Car.createCar`, `CarPropertyManager.getIntProperty` / `registerCallback`, `VehiclePropertyIds.GEAR_SELECTION` |
+| 주행 제한 | `CarUxRestrictionsManager` |
+| 창문 | `Window.checkWindowPositionCapabilities`, `getCurrentWindowPosition`, `registerWindowPosition` |
+| 도어 위치 | `Door.checkDoorPositionCapabilities`, `getCurrentDoorPosition`, `registerDoorPosition` |
+| 도어 잠금 | `Door.checkDoorLockCapabilities`, `getDoorLockState`, `registerDoorLockState` |
+| 실내등, 하향등, 미등, 독서등 | `Light.check*Capabilities`, `getCurrent*`, `register*` |
+| 뒷좌석 | `Seat.checkSeatOccupancyCapabilities`, `getCurrentSeatOccupancy`, `registerSeatOccupancy` |
+| 공조 | `HVAC.checkHvacPowerCapabilities`, `getHvacPowerState`, `registerHvacPowerState` |
+| 타이어 저압 | `Tire.checkLowTirePressureCapabilities`, `getLowTirePressure` |
+| 워셔액 | `Safety.checkLowWasherFluidWarningStateCapabilities`, `hasLowWasherFluidWarning`, `registerLowWasherFluidWaringState` |
+| 경고등 | `Safety.getTelltalesInfo` 한 번 |
+| 배터리 SOC | `EvBattery.checkEvBatteryStateOfChargeCapabilities`, `getEvBatteryStateOfCharge`, `registerEvBatteryStateOfCharge` |
+| 연료 | `Fuel.checkFuelPercentCapabilities`, `getFuelPercent`, `registerFuelPercent` |
+| 이번 트립 거리 | `Odometer.checkTripCurrentDrivingDistanceCapabilities`, `getTripCurrentDrivingDistance`, `registerTripCurrentDrivingDistance` |
+
+선언한 권한은 `android.car.permission.CAR_POWERTRAIN`과 `pleos.car.permission.CAR_WINDOWS`, `CAR_DOORS`, `CAR_LIGHTS`, `CAR_SEATS`, `CAR_SAFETY`, `CAR_ENERGY`, `CAR_DRIVE`, `CAR_CLIMATE`입니다. `PRIVATE_*`와 `CONTROL_*`는 선언하지 않습니다.
+
+도어 잠금 Boolean은 SDK `setDoorLock` 설명대로 true가 잠김, false가 해제입니다. 도어 위치는 최소값 0이 닫힘이고 그보다 크면 열림입니다. 보닛과 트렁크는 위치가 열려 있거나 래치가 풀리면 각각의 열림 카드로 두고, 실내 도어 잠금 카드에는 넣지 않습니다. SOC 값이 있으면 연료는 확인할 수 없는 항목에서 뺍니다.
+
+## 정차 중에만
+
+주행 중 사용(distraction optimization)을 매니페스트에 선언하지 않습니다. AAOS는 그 선언이 없는 화면을 주행 중에 제한합니다. 앱도 기어가 P일 때만 점검 세션을 엽니다. D, R, N에서는 카드를 만들지 않습니다. `CarUxRestrictions`가 운전자 주의 분산 최소화를 요구하면 실측 세션을 멈춥니다. 화면에는 애니메이션을 넣지 않았습니다.
+
+## 빌드와 실행
+
+- JDK 17
 - Android SDK Platform 35, Build-Tools 35
 - `ANDROID_HOME` 또는 `local.properties`의 `sdk.dir`
 
 ```bash
-./gradlew assembleDebug assembleRelease
-./gradlew test
+./gradlew test assembleDebug assembleRelease
 ```
 
 산출물:
@@ -18,77 +81,33 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
-release 빌드는 아직 디버그 키스토어로 서명합니다. `app/build.gradle.kts`의 `release.signingConfig`가 `debug`입니다. 배포용 서명은 나중에 바꿉니다. 난독화는 꺼져 있습니다.
+release 서명은 `PARK_LEAVE_STORE_FILE`, `PARK_LEAVE_STORE_PASSWORD`, `PARK_LEAVE_KEY_ALIAS`, `PARK_LEAVE_KEY_PASSWORD`를 환경 변수나 `~/.gradle/gradle.properties`에서 읽습니다. 값이 없으면 디버그 키스토어로 서명하고 빌드는 계속됩니다. 키스토어 파일은 커밋하지 않습니다. 제출용 복사 위치는 `apk/README.md`에 있습니다.
 
-앱 ID는 `io.github.kwn00.parkandleave`입니다. minSdk 28, targetSdk 34, compileSdk 35. 대상 기기는 Android 14 / API 34 자동차 에뮬레이터입니다.
+앱 ID는 `io.github.kwn00.parkandleave`입니다. minSdk 28, targetSdk 34, compileSdk 35.
 
-## 에뮬레이터에 설치
-
-Pleos Connect Emulator 2.1.0을 Cold boot로 띄운 뒤:
+Pleos Connect Emulator를 Cold boot로 띄운 뒤:
 
 ```bash
-adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n io.github.kwn00.parkandleave/.MainActivity
-```
-
-release APK도 같은 방식으로 설치할 수 있습니다.
-
-```bash
-adb install -r app/build/outputs/apk/release/app-release.apk
-```
-
-## Virtual Console에서 상태 바꾸기
-
-에뮬레이터가 뜬 터미널에서:
-
-```bash
 adb forward tcp:8088 tcp:8088
 ```
 
-브라우저에서 `http://127.0.0.1:8088/` 을 엽니다. 콘솔에서 Gear를 P/R/N/D로 바꾸고, 도어, 잠금, 트렁크, 창문, 실내등, 독서등, 하향등, 미등, 공조, 배터리 SOC, 연료, 타이어, 경고등을 조작합니다.
+브라우저에서 `http://127.0.0.1:8088/` 을 열고 Gear, 도어, 잠금, 창문, 조명, 공조, 배터리, 연료, 타이어를 바꿉니다. Quick boot에서는 차량 신호가 오지 않을 수 있습니다. 데모 촬영 순서는 `docs/demo-scenario.md`에 있습니다.
 
-## 신호 디버그 화면
+요약 화면의 **신호 디버그**는 `GEAR_SELECTION` raw 값과 읽은 신호를 보여 줍니다. **모의**는 에뮬레이터 없이 카드를 볼 때 쓰는 가짜 데이터입니다. 모의 모드에는 주행 제한을 적용하지 않습니다.
 
-요약 화면의 **신호 디버그**로 들어갑니다. 화면 위쪽에 `GEAR_SELECTION`의 프로퍼티 ID(`289408000`)와 raw 정수, 해석된 기어 이름이 크게 나옵니다. P는 `4`, R은 `2`, N은 `1`, D는 `8`입니다. 그 아래는 앱이 읽은 창문 위치, 도어 위치, 잠금 Boolean, 조명, 좌석 점유, 공조, 타이어 float, 워셔액, 경고등, SOC, 연료, 트립 거리입니다.
+## 한계
 
-**실측**은 에뮬레이터 값입니다. **모의**는 앱 안의 가짜 데이터로, 에뮬레이터 없이 요약 카드를 볼 때 씁니다. 모의 모드에서는 시나리오 버튼과 해소 버튼으로 카드가 줄거나 "모두 정상"이 되는 것을 확인할 수 있습니다. 모의 모드는 주행 제한을 적용하지 않습니다. 실측 모드는 제한이 켜지면 점검 화면을 멈춥니다.
-
-## 기어 P가 실제로 들어오는지 확인
-
-1. 에뮬레이터를 Cold boot로 실행합니다. Quick boot에서는 차량 신호가 동작하지 않을 수 있습니다.
-2. `adb install`로 디버그 APK를 설치하고 앱을 엽니다.
-3. `adb forward tcp:8088 tcp:8088` 후 Virtual Console을 엽니다.
-4. 앱에서 **신호 디버그**를 열고 **실측**이 선택돼 있는지 확인합니다.
-5. Virtual Console에서 Gear를 D로 바꿉니다. 디버그 화면의 raw 값이 `8`, 이름이 `DRIVE`로 바뀌는지 봅니다. 요약 화면으로 돌아오면 점검 카드는 나오지 않아야 합니다.
-6. Gear를 P(`4`, `PARK`)로 바꿉니다. 요약 화면이 "점검 중"을 거쳐 "모두 정상" 또는 "확인 n건"으로 바뀝니다.
-7. 창문을 연 뒤 다시 닫습니다. 디버그 화면의 `window.*` 값과 요약 카드가 같이 바뀌는지 확인합니다.
-8. raw가 비어 있고 오류 문구가 보이면 `CAR_POWERTRAIN`으로 `GEAR_SELECTION`을 읽지 못한 것입니다. 그 경우 요약 화면의 **지금 점검**으로 차량 신호만 조회할 수 있습니다.
-
-## 실측 API와 목업
-
-| 기능 | 구현 |
-|---|---|
-| 기어 | AAOS `CarPropertyManager` `VehiclePropertyIds.GEAR_SELECTION`. Vehicle SDK의 `Gear` API는 "deprecated, use the Google GEAR_SELECTION property"라서 쓰지 않습니다. |
-| 창문, 도어, 잠금, 조명, 좌석 점유, 공조, 타이어 저압, 워셔액, SOC, 연료, 트립 거리 | `ai.pleos.playground:Vehicle:2.3.2`. capability를 보고 지원하지 않는 항목은 숨깁니다. 변화는 `register*`로 구독합니다. |
-| 경고등 | `Safety.getTelltalesInfo`를 P 진입과 새로고침 때 한 번 호출합니다. SDK 2.3.2 바이트코드에서 `getTelltalesInfo`, `checkTelltalesCapabilities`, `registerTelltales`가 모두 `PRIVATE_CAR_SAFETY`입니다. 일반 앱에서는 실패할 수 있고, 그 오류는 디버그 화면에 남습니다. 실패해도 다른 항목 조회는 계속합니다. 타이어 압력 `registerTirePressure`도 private이라 저압은 조회만 합니다. |
-| 음성 | `OnDeviceSpeech` 인터페이스. 구현체는 연결하지 않았고, 문제가 있을 때 짧은 알림음만 냅니다. 모두 정상이면 소리를 내지 않습니다. |
-| 창문·조명·잠금 제어 | `VehicleControlGateway`. 항상 사용 불가입니다. 확인 항목이 있으면 요약 화면에 직접 조치하면 갱신된다는 한 줄을 둡니다. |
-| 장소 프로필 | `PlaceProfileSource`. 항상 기본 프로필입니다. |
-| 모의 데이터 | 디버그 화면의 **모의**. 단위 테스트도 이 스냅샷 모델로 점검 규칙을 검증합니다. |
-
-조회 권한은 `android.car.permission.CAR_POWERTRAIN`과 `pleos.car.permission.CAR_WINDOWS`, `CAR_DOORS`, `CAR_LIGHTS`, `CAR_SEATS`, `CAR_SAFETY`, `CAR_ENERGY`, `CAR_DRIVE`, `CAR_CLIMATE`입니다. `PRIVATE_*`와 `CONTROL_*`는 선언하지 않습니다.
-
-주행 중 사용(Distraction Optimization)은 선언하지 않습니다. 정차가 아니면 점검 세션을 열지 않고, `CarUxRestrictions`가 운전자 주의 최적화를 요구하면 실측 세션과 소리를 멈춥니다. 화면에는 애니메이션을 넣지 않았습니다. 요약은 창 폭에 맞춘 카드 격자입니다. 카드는 아이콘, 제목, 한 줄 상태이고, 본문 글자는 24sp 이상입니다. 이번 정차에서 해결된 항목은 정보 색으로 남습니다.
-
-`getDoorLockState`의 Boolean은 잠김=`true`로 해석합니다. 디버그 화면의 `locked=`가 반대라면 그 원본 값을 기준으로 보면 됩니다. `getLowTirePressure`는 0이면 정상, 0 초과 1 이하면 저압으로 보고, 더 큰 값은 압력 단위일 수 있어 카드로 올리지 않고 원본만 보여 줍니다. 트립 거리 float의 단위는 SDK 시그니처만으로는 확정하지 않아 숫자 그대로 표시합니다. SOC 20% 미만, 연료 15% 미만을 확인 항목으로 보고, SOC 30% 미만이면서 이번 트립 거리가 0보다 크면 "내일 같은 거리라면 충전 권장"을 한 줄 추가합니다.
+- 경고등은 서드파티 앱이 읽을 수 없습니다. Vehicle SDK 2.3.2 `Safety` KDoc은 `getTelltalesInfo`, `checkTelltalesCapabilities`, `registerTelltales`에 `pleos.car.permission.PRIVATE_CAR_SAFETY`(protection level `signature|privileged`)를 적습니다. `SafetyImpl`은 `@RequiresCustomPermission(PleosPermission.PRIVATE_CAR_SAFETY)`로 검사하고, 권한이 없으면 `PermissionUtil`이 `SecurityException`을 던집니다. 인터페이스의 `getTelltalesInfo`에는 `@RequiresPermission(CAR_SAFETY)`도 붙어 있습니다. `CAR_SAFETY`는 normal 권한이라 이 앱이 선언하지만, KDoc과 구현의 검사는 `PRIVATE_CAR_SAFETY`입니다. Android는 `signature|privileged`를 선언 인증서와 같은 앱, 또는 권한 허용 목록에 있는 시스템 앱에만 줍니다. 일반 앱은 받을 수 없습니다. 그래서 경고등 실패는 "확인된 이상 없음"으로 세지 않습니다. 읽을 수 있는 신호가 정상이면 "모두 정상 / 내려도 됩니다"와 함께 "경고등: 이 차량에서 앱이 읽을 수 없음"을 보여 줍니다. 참고: [permission element](https://developer.android.com/guide/topics/manifest/permission-element#plevel).
+- 타이어 압력 구독 `registerTirePressure`도 같은 private 권한이라 저압은 조회만 합니다. `getLowTirePressure`가 null이면 정상 압력이 아니라 "확인할 수 없음"입니다. 0은 저압 아님, 0 초과 1 이하는 저압, 더 큰 값은 단위가 문서에 없어 카드로 올리지 않습니다.
+- 창문, 조명, 잠금을 앱이 대신 끄거나 잠그지는 않습니다. 직접 조치하면 구독 값이 카드를 갱신합니다.
+- 음성은 짧은 알림음만 냅니다. 모두 정상이면 소리가 없습니다.
+- 트립 거리 float의 단위는 SDK 시그니처만으로 확정하지 않아 숫자 그대로 둡니다. SOC 20% 미만, 연료 15% 미만을 확인 항목으로 보고, SOC 30% 미만이면서 이번 트립 거리가 0보다 크면 "내일 같은 거리라면 충전 권장"을 덧붙입니다.
+- `getDoorLockState`의 Boolean은 잠김=`true`로 해석합니다.
 
 ## 모듈
 
-- `domain`: 점검 규칙, 세션, 모의 시나리오, 디버그 행. JVM 단위 테스트.
-- `designsystem`: 주간/야간 색과 글자 크기.
-- `app`: Compose 화면, AAOS 기어, Vehicle SDK, 모의 보드.
-
-## APK 폴더
-
-제출용 APK 이름 규칙은 `apk/README.md`에 있습니다. 이 저장소에는 APK 파일을 넣지 않습니다.
+- `domain`: 점검 규칙, P 재진입과 연결 상태의 순수 리듀서, 모의 시나리오. JVM 단위 테스트.
+- `designsystem`: 주간과 야간 색, 글자 크기.
+- `app`: Compose 화면, AAOS 기어, Vehicle SDK.
