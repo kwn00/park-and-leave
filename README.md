@@ -1,6 +1,6 @@
 # Park & Leave
 
-기어를 P로 바꾸는 순간 창문, 도어, 조명, 뒷좌석, 공조, 타이어, 워셔액, 경고등, 잔여 에너지를 한 화면으로 모아 "모두 정상" 또는 "확인 n건"으로 보여 주는 정차 전용 앱입니다. 항목이 해결되면 카드가 바로 갱신됩니다.
+기어를 P로 바꾸는 순간 창문, 도어, 조명, 뒷좌석, 공조, 타이어, 워셔액, 경고등, 잔여 에너지를 한 화면으로 모아 "모두 정상" 또는 "확인 n건"으로 보여 주는 정차 전용 앱입니다. 항목이 해결되면 그 카드는 해결 상태로 남고, 정차가 끝나면 지워집니다.
 
 ## 빌드
 
@@ -73,13 +73,13 @@ adb forward tcp:8088 tcp:8088
 | 창문, 도어, 잠금, 조명, 좌석 점유, 공조, 타이어 저압, 워셔액, SOC, 연료, 트립 거리 | `ai.pleos.playground:Vehicle:2.3.2`. capability를 보고 지원하지 않는 항목은 숨깁니다. 변화는 `register*`로 구독합니다. |
 | 경고등 | `Safety.getTelltalesInfo`를 P 진입과 새로고침 때 한 번 호출합니다. SDK 2.3.2 바이트코드에서 `getTelltalesInfo`, `checkTelltalesCapabilities`, `registerTelltales`가 모두 `PRIVATE_CAR_SAFETY`입니다. 일반 앱에서는 실패할 수 있고, 그 오류는 디버그 화면에 남습니다. 실패해도 다른 항목 조회는 계속합니다. 타이어 압력 `registerTirePressure`도 private이라 저압은 조회만 합니다. |
 | 음성 | `OnDeviceSpeech` 인터페이스. 구현체는 연결하지 않았고, 문제가 있을 때 짧은 알림음만 냅니다. 모두 정상이면 소리를 내지 않습니다. |
-| 창문·조명·잠금 제어 | `VehicleControlGateway`. 항상 사용 불가이고, 카드에는 직접 조작하라는 안내만 있습니다. |
+| 창문·조명·잠금 제어 | `VehicleControlGateway`. 항상 사용 불가입니다. 확인 항목이 있으면 요약 화면에 직접 조치하면 갱신된다는 한 줄을 둡니다. |
 | 장소 프로필 | `PlaceProfileSource`. 항상 기본 프로필입니다. |
 | 모의 데이터 | 디버그 화면의 **모의**. 단위 테스트도 이 스냅샷 모델로 점검 규칙을 검증합니다. |
 
 조회 권한은 `android.car.permission.CAR_POWERTRAIN`과 `pleos.car.permission.CAR_WINDOWS`, `CAR_DOORS`, `CAR_LIGHTS`, `CAR_SEATS`, `CAR_SAFETY`, `CAR_ENERGY`, `CAR_DRIVE`, `CAR_CLIMATE`입니다. `PRIVATE_*`와 `CONTROL_*`는 선언하지 않습니다.
 
-주행 중 사용(Distraction Optimization)은 선언하지 않습니다. 정차가 아니면 점검 세션을 열지 않고, `CarUxRestrictions`가 운전자 주의 최적화를 요구하면 실측 세션과 소리를 멈춥니다. 화면에는 애니메이션을 넣지 않았습니다. 카드는 제목, 상태, 안내 세 줄입니다.
+주행 중 사용(Distraction Optimization)은 선언하지 않습니다. 정차가 아니면 점검 세션을 열지 않고, `CarUxRestrictions`가 운전자 주의 최적화를 요구하면 실측 세션과 소리를 멈춥니다. 화면에는 애니메이션을 넣지 않았습니다. 요약은 창 폭에 맞춘 카드 격자입니다. 카드는 아이콘, 제목, 한 줄 상태이고, 본문 글자는 24sp 이상입니다. 이번 정차에서 해결된 항목은 정보 색으로 남습니다.
 
 `getDoorLockState`의 Boolean은 잠김=`true`로 해석합니다. 디버그 화면의 `locked=`가 반대라면 그 원본 값을 기준으로 보면 됩니다. `getLowTirePressure`는 0이면 정상, 0 초과 1 이하면 저압으로 보고, 더 큰 값은 압력 단위일 수 있어 카드로 올리지 않고 원본만 보여 줍니다. 트립 거리 float의 단위는 SDK 시그니처만으로는 확정하지 않아 숫자 그대로 표시합니다. SOC 20% 미만, 연료 15% 미만을 확인 항목으로 보고, SOC 30% 미만이면서 이번 트립 거리가 0보다 크면 "내일 같은 거리라면 충전 권장"을 한 줄 추가합니다.
 

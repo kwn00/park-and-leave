@@ -84,7 +84,7 @@ fun DebugScreen(
                 maxLines = 1,
             )
             state.gear.error?.let { error ->
-                Text(error, style = MaterialTheme.typography.bodyLarge, color = colors.onWarning, maxLines = 3)
+                Text(error, style = MaterialTheme.typography.bodyLarge, color = colors.onCritical, maxLines = 3)
             }
         }
         itemsIndexed(state.debugRows, key = { index, row -> "$index:${row.label}:${row.value}" }) { _, row ->

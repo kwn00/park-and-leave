@@ -6,34 +6,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 fun parkTypography(): Typography = Typography(
+    displayLarge = TextStyle(
+        fontSize = 96.sp,
+        lineHeight = 112.sp,
+        fontWeight = FontWeight.Bold,
+    ),
     displaySmall = TextStyle(
-        fontSize = 40.sp,
-        lineHeight = 48.sp,
+        fontSize = 56.sp,
+        lineHeight = 64.sp,
         fontWeight = FontWeight.Bold,
     ),
     headlineMedium = TextStyle(
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
+        fontSize = 40.sp,
+        lineHeight = 48.sp,
         fontWeight = FontWeight.SemiBold,
     ),
     titleLarge = TextStyle(
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
         fontWeight = FontWeight.SemiBold,
     ),
     bodyLarge = TextStyle(
-        fontSize = 20.sp,
-        lineHeight = 28.sp,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
         fontWeight = FontWeight.Normal,
     ),
     bodyMedium = TextStyle(
-        fontSize = 18.sp,
-        lineHeight = 26.sp,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
         fontWeight = FontWeight.Normal,
     ),
     labelLarge = TextStyle(
-        fontSize = 18.sp,
-        lineHeight = 24.sp,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
         fontWeight = FontWeight.Medium,
     ),
 )

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("app.cash.paparazzi") version "1.3.5"
 }
 
 android {
@@ -41,6 +42,11 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
+
     useLibrary("android.car")
 
     packaging {
@@ -67,5 +73,6 @@ dependencies {
     implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.paparazzi)
     testImplementation(files(android.sdkDirectory.resolve("platforms/android-35/optional/android.car.jar")))
 }

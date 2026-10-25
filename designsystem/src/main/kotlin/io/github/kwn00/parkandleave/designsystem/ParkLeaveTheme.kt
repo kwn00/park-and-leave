@@ -8,8 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
-fun ParkLeaveTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun ParkLeaveTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    val dark = darkTheme
     val colors = if (dark) NightColors else DayColors
     val scheme = if (dark) {
         darkColorScheme(

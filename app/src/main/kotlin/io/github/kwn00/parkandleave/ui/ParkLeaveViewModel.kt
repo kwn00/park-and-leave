@@ -14,10 +14,14 @@ import io.github.kwn00.parkandleave.domain.Gear
 import io.github.kwn00.parkandleave.domain.GearReading
 import io.github.kwn00.parkandleave.domain.ParkingCheckEvaluator
 import io.github.kwn00.parkandleave.domain.ParkingReport
+import io.github.kwn00.parkandleave.domain.SeenIssue
 import io.github.kwn00.parkandleave.domain.SessionPhase
+import io.github.kwn00.parkandleave.domain.SummaryCard
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.checkSession
 import io.github.kwn00.parkandleave.domain.formatDebugRows
+import io.github.kwn00.parkandleave.domain.seenForSession
+import io.github.kwn00.parkandleave.domain.summaryCards
 import io.github.kwn00.parkandleave.future.DefaultPlaceProfileSource
 import io.github.kwn00.parkandleave.future.UnavailableOnDeviceSpeech
 import io.github.kwn00.parkandleave.future.UnavailableVehicleControl
@@ -69,6 +73,7 @@ data class ParkUiState(
     val speechMode: String,
     val controlAvailable: Boolean,
     val placeLabel: String,
+    val cards: List<SummaryCard>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -84,6 +89,7 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
     private val origin = MutableStateFlow(DataOrigin.LIVE)
     private val screen = MutableStateFlow(AppScreen.SUMMARY)
     private val manual = MutableStateFlow(false)
+    private val seen = MutableStateFlow<List<SeenIssue>>(emptyList())
     private var spoken = false
 
     private val selectedGear = origin.flatMapLatest { selected ->
@@ -107,7 +113,8 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
         combine(selectedSnapshot, aaos.restricted, aaos.status, vehicle.status) { snapshot, restricted, liveStatus, vehicleStatus ->
             VehicleSide(snapshot, restricted, liveStatus, vehicleStatus)
         },
-    ) { selection, vehicleSide ->
+        seen,
+    ) { selection, vehicleSide, seenIssues ->
         val restricted = selection.origin == DataOrigin.LIVE && vehicleSide.restricted
         val session = checkSession(selection.gear.gear, restricted, selection.manual)
         val report = if (vehicleSide.snapshot.ready && session.phase == SessionPhase.ACTIVE) {
@@ -134,6 +141,11 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             speechMode = speaker.modeLabel,
             controlAvailable = control.available,
             placeLabel = places.activeProfile().name,
+            cards = if (report != null && session.phase == SessionPhase.ACTIVE) {
+                summaryCards(report, seenIssues)
+            } else {
+                emptyList()
+            },
         )
     }.stateIn(
         viewModelScope,
@@ -146,6 +158,10 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
         vehicle.start()
         viewModelScope.launch {
             state.collect { ui ->
+                val nextSeen = seenForSession(ui.session.phase, seen.value, ui.report)
+                if (nextSeen != seen.value) {
+                    seen.value = nextSeen
+                }
                 val line = ui.report?.speechLine
                 if (ui.session.phase != SessionPhase.ACTIVE || line == null) {
                     if (ui.session.phase != SessionPhase.ACTIVE) {
@@ -232,6 +248,7 @@ class ParkLeaveViewModel(application: Application) : AndroidViewModel(applicatio
             speechMode = speaker.modeLabel,
             controlAvailable = false,
             placeLabel = places.activeProfile().name,
+            cards = emptyList(),
         )
     }
 }

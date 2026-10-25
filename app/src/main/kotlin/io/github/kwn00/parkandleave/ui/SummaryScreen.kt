@@ -5,25 +5,50 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.kwn00.parkandleave.designsystem.LocalParkLeaveColors
-import io.github.kwn00.parkandleave.domain.CheckItem
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveColors
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveTheme
+import io.github.kwn00.parkandleave.domain.CardTone
+import io.github.kwn00.parkandleave.domain.CheckSession
 import io.github.kwn00.parkandleave.domain.Gear
+import io.github.kwn00.parkandleave.domain.GearReading
+import io.github.kwn00.parkandleave.domain.HeadlineTone
+import io.github.kwn00.parkandleave.domain.ParkingReport
 import io.github.kwn00.parkandleave.domain.SessionPhase
-import io.github.kwn00.parkandleave.domain.Severity
+import io.github.kwn00.parkandleave.domain.SignalId
+import io.github.kwn00.parkandleave.domain.SummaryCard
+import io.github.kwn00.parkandleave.domain.VehicleSnapshot
+import io.github.kwn00.parkandleave.domain.headlineTone
+import io.github.kwn00.parkandleave.domain.summaryGridColumns
 
 @Composable
 fun SummaryScreen(
@@ -37,141 +62,418 @@ fun SummaryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(24.dp),
+            .padding(horizontal = 32.dp, vertical = 24.dp),
     ) {
-        val wide = maxWidth >= 720.dp
-        if (wide) {
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                SummaryColumn(state, onOpenDebug, onManualCheck, Modifier.weight(1f))
-                IssueColumn(state, Modifier.weight(1.1f))
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SummaryColumn(state, onOpenDebug, onManualCheck, Modifier.fillMaxWidth())
-                IssueColumn(state, Modifier.fillMaxWidth())
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryColumn(
-    state: ParkUiState,
-    onOpenDebug: () -> Unit,
-    onManualCheck: () -> Unit,
-    modifier: Modifier,
-) {
-    val colors = LocalParkLeaveColors.current
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Park & Leave", style = MaterialTheme.typography.headlineMedium, color = colors.onSurface)
-            Text(gearLabel(state), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-        }
-        when (state.session.phase) {
-            SessionPhase.FROZEN -> {
-                Text(
-                    "주행 중에는 점검을 멈춥니다",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = colors.onWarning,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        val width = maxWidth
+        Column(Modifier.fillMaxSize()) {
+            SummaryHeader(state, onOpenDebug)
+            Spacer(Modifier.height(20.dp))
+            when (state.session.phase) {
+                SessionPhase.FROZEN -> StatusMessage(
+                    text = "주행 중에는 점검을 멈춥니다",
+                    color = colors.onCritical,
+                    modifier = Modifier.weight(1f),
                 )
-            }
-            SessionPhase.IDLE -> {
-                Text(
-                    if (state.gear.gear == Gear.UNKNOWN) {
+                SessionPhase.IDLE -> StatusMessage(
+                    text = if (state.gear.gear == Gear.UNKNOWN) {
                         "기어를 아직 읽지 못했습니다"
                     } else {
                         "기어를 P에 두면 점검을 시작합니다"
                     },
-                    style = MaterialTheme.typography.displaySmall,
                     color = colors.onSurface,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    extra = if (state.showManualCheck) {
+                        { ManualCheckButton(onManualCheck) }
+                    } else {
+                        null
+                    },
                 )
-                if (state.showManualCheck) {
-                    WideButton("지금 점검", onManualCheck)
-                }
+                SessionPhase.ACTIVE -> ActiveSummary(
+                    state = state,
+                    width = width,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            SessionPhase.ACTIVE -> {
-                if (state.scanning || state.report == null) {
-                    Text("점검 중", style = MaterialTheme.typography.displaySmall, color = colors.onSurface)
-                } else {
-                    val report = state.report
-                    Text(report.headline, style = MaterialTheme.typography.displaySmall, color = colors.onSurface)
-                    report.clearanceLine?.let { line ->
-                        Text(line, style = MaterialTheme.typography.headlineMedium, color = colors.onOk, maxLines = 1)
-                    }
-                    report.tomorrowLine?.let { line ->
-                        Text(line, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface, maxLines = 2)
-                    }
-                    if (report.items.isNotEmpty() && !state.controlAvailable) {
-                        Text(
-                            "직접 조치하면 카드가 갱신됩니다",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.onSurfaceMuted,
-                            maxLines = 2,
-                        )
-                    }
-                }
-            }
-        }
-        WideButton("신호 디버그", onOpenDebug)
-    }
-}
-
-@Composable
-private fun IssueColumn(state: ParkUiState, modifier: Modifier) {
-    val items = if (state.session.phase == SessionPhase.ACTIVE) state.report?.items.orEmpty() else emptyList()
-    if (items.isEmpty()) return
-    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(items, key = { it.id.name }) { item ->
-            CheckCard(item)
         }
     }
 }
 
 @Composable
-private fun CheckCard(item: CheckItem) {
+private fun SummaryHeader(state: ParkUiState, onOpenDebug: () -> Unit) {
     val colors = LocalParkLeaveColors.current
-    val background = when (item.severity) {
-        Severity.WARNING -> colors.warning
-        Severity.CAUTION -> colors.caution
-    }
-    val foreground = when (item.severity) {
-        Severity.WARNING -> colors.onWarning
-        Severity.CAUTION -> colors.onCaution
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(background)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(item.title, style = MaterialTheme.typography.titleLarge, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(item.detail, style = MaterialTheme.typography.bodyLarge, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(item.guidance, style = MaterialTheme.typography.bodyMedium, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            "Park & Leave",
+            style = MaterialTheme.typography.titleLarge,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                gearLabel(state),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurface,
+                maxLines = 1,
+            )
+            TextButton(
+                onClick = onOpenDebug,
+                modifier = Modifier.heightIn(min = 64.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurfaceMuted),
+            ) {
+                Text("신호 디버그", style = MaterialTheme.typography.labelLarge)
+            }
+        }
     }
 }
 
 @Composable
-private fun WideButton(label: String, onClick: () -> Unit) {
+private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
+    val colors = LocalParkLeaveColors.current
+    val report = state.report
+    if (state.scanning || report == null) {
+        StatusMessage("점검 중", colors.onSurface, modifier)
+        return
+    }
+    if (report.allClear && state.cards.isEmpty()) {
+        AllClearHero(report, modifier.fillMaxWidth())
+        return
+    }
+    val columns = summaryGridColumns(width.value.toInt(), state.cards.size)
+    val singleRow = !report.allClear && state.cards.isNotEmpty() && state.cards.size <= columns
+    if (singleRow) {
+        Column(modifier) {
+            IssueHeadline(state, report)
+            Spacer(Modifier.height(28.dp))
+            CardGrid(state.cards, width, Modifier.weight(1f), expand = true)
+        }
+        return
+    }
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        if (report.allClear) {
+            AllClearHero(report, Modifier.fillMaxWidth().heightIn(min = 420.dp))
+            Spacer(Modifier.height(28.dp))
+            Text(
+                "해결된 항목",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(16.dp))
+        } else {
+            IssueHeadline(state, report)
+            Spacer(Modifier.height(28.dp))
+        }
+        CardGrid(state.cards, width, Modifier.fillMaxWidth(), expand = false)
+    }
+}
+
+@Composable
+private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
+    val colors = LocalParkLeaveColors.current
+    val tone = headlineTone(report.allClear, state.cards)
+    Text(
+        report.headline,
+        style = MaterialTheme.typography.displayLarge,
+        color = headlineColor(tone, colors),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+    report.tomorrowLine?.let { line ->
+        Spacer(Modifier.height(8.dp))
+        Text(
+            line,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (state.cards.any { !it.resolved } && !state.controlAvailable) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "직접 조치하면 카드가 갱신됩니다",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun AllClearHero(report: ParkingReport, modifier: Modifier) {
+    val colors = LocalParkLeaveColors.current
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.ok)
+            .padding(horizontal = 40.dp, vertical = 48.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        StatusGlyph(GlyphKind.CHECK, colors.onOk, Modifier.size(96.dp))
+        Spacer(Modifier.height(20.dp))
+        Text(
+            report.headline,
+            style = MaterialTheme.typography.displayLarge,
+            color = colors.onOk,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        report.clearanceLine?.let { line ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                line,
+                style = MaterialTheme.typography.headlineMedium,
+                color = colors.onOk,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
+        report.tomorrowLine?.let { line ->
+            Spacer(Modifier.height(12.dp))
+            Text(
+                line,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.onOk,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CardGrid(
+    cards: List<SummaryCard>,
+    width: Dp,
+    modifier: Modifier = Modifier,
+    expand: Boolean = false,
+) {
+    if (cards.isEmpty()) return
+    val columns = summaryGridColumns(width.value.toInt(), cards.size)
+    val minHeight = if (expand) 280.dp else 168.dp
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        for (row in cards.chunked(columns)) {
+            val rowModifier = if (expand) {
+                Modifier.fillMaxWidth().weight(1f)
+            } else {
+                Modifier.fillMaxWidth()
+            }
+            Row(
+                modifier = rowModifier,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                for (card in row) {
+                    val cardModifier = if (expand) {
+                        Modifier.weight(1f).fillMaxHeight()
+                    } else {
+                        Modifier.weight(1f)
+                    }
+                    CheckCard(card, minHeight, cardModifier)
+                }
+                var blanks = columns - row.size
+                while (blanks > 0) {
+                    Spacer(Modifier.weight(1f))
+                    blanks -= 1
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckCard(card: SummaryCard, minHeight: Dp, modifier: Modifier) {
+    val colors = LocalParkLeaveColors.current
+    val (background, foreground) = cardColors(card.tone, colors)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .semantics { contentDescription = "${card.title}. ${card.detail}" }
+            .padding(horizontal = 24.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusGlyph(glyphFor(card.id), foreground, Modifier.size(48.dp))
+            Spacer(Modifier.size(16.dp))
+            Text(
+                card.title,
+                style = MaterialTheme.typography.titleLarge,
+                color = foreground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            card.detail,
+            style = MaterialTheme.typography.bodyLarge,
+            color = foreground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun StatusMessage(
+    text: String,
+    color: Color,
+    modifier: Modifier,
+    extra: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.displayLarge,
+            color = color,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (extra != null) {
+            Spacer(Modifier.height(24.dp))
+            extra()
+        }
+    }
+}
+
+@Composable
+private fun ManualCheckButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth()
+            .widthIn(min = 280.dp)
             .heightIn(min = 64.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text("지금 점검", style = MaterialTheme.typography.labelLarge)
     }
+}
+
+private fun cardColors(tone: CardTone, colors: ParkLeaveColors): Pair<Color, Color> = when (tone) {
+    CardTone.CRITICAL -> colors.critical to colors.onCritical
+    CardTone.WARN -> colors.warn to colors.onWarn
+    CardTone.INFO -> colors.info to colors.onInfo
+}
+
+private fun headlineColor(tone: HeadlineTone, colors: ParkLeaveColors): Color = when (tone) {
+    HeadlineTone.NEUTRAL -> colors.onSurface
+    HeadlineTone.CRITICAL -> colors.onCritical
+    HeadlineTone.WARN -> colors.onWarn
+    HeadlineTone.OK -> colors.onOk
 }
 
 private fun gearLabel(state: ParkUiState): String {
     val raw = state.gear.rawValue?.toString() ?: "-"
     return "$raw ${state.gear.gear.name}"
+}
+
+@Preview(name = "확인 건", widthDp = 1682, heightDp = 900)
+@Composable
+private fun IssuesWidePreview() {
+    ParkLeaveTheme(darkTheme = false) {
+        SummaryScreen(previewIssues(), onOpenDebug = {}, onManualCheck = {})
+    }
+}
+
+@Preview(name = "모두 정상", widthDp = 1682, heightDp = 900)
+@Composable
+private fun AllClearPreview() {
+    ParkLeaveTheme(darkTheme = false) {
+        SummaryScreen(previewAllClear(resolved = false), onOpenDebug = {}, onManualCheck = {})
+    }
+}
+
+@Preview(name = "해결 후", widthDp = 1682, heightDp = 900)
+@Composable
+private fun ResolvedPreview() {
+    ParkLeaveTheme(darkTheme = false) {
+        SummaryScreen(previewAllClear(resolved = true), onOpenDebug = {}, onManualCheck = {})
+    }
+}
+
+@Preview(name = "야간 확인", widthDp = 1682, heightDp = 900)
+@Composable
+private fun IssuesNightPreview() {
+    ParkLeaveTheme(darkTheme = true) {
+        SummaryScreen(previewIssues(), onOpenDebug = {}, onManualCheck = {})
+    }
+}
+
+internal fun previewIssues(): ParkUiState {
+    val cards = listOf(
+        SummaryCard(SignalId.REAR_OCCUPANCY, CardTone.CRITICAL, "뒷좌석 점유", "2열 왼쪽 탑승", resolved = false),
+        SummaryCard(SignalId.EXTERIOR_LIGHT, CardTone.WARN, "외부등", "미등 켜짐", resolved = false),
+        SummaryCard(SignalId.HVAC, CardTone.WARN, "공조", "켜짐", resolved = false),
+        SummaryCard(SignalId.WINDOW, CardTone.INFO, "창문 열림", "해결됨", resolved = true),
+    )
+    return previewState(
+        report = ParkingReport(
+            items = emptyList(),
+            headline = "확인 3건",
+            allClear = false,
+            tomorrowLine = null,
+            clearanceLine = null,
+            speechLine = null,
+        ),
+        cards = cards,
+    )
+}
+
+internal fun previewAllClear(resolved: Boolean): ParkUiState {
+    val cards = if (resolved) {
+        listOf(
+            SummaryCard(SignalId.WINDOW, CardTone.INFO, "창문 열림", "해결됨", resolved = true),
+            SummaryCard(SignalId.READING_LIGHT, CardTone.INFO, "독서등 켜짐", "해결됨", resolved = true),
+        )
+    } else {
+        emptyList()
+    }
+    return previewState(
+        report = ParkingReport(
+            items = emptyList(),
+            headline = "모두 정상",
+            allClear = true,
+            tomorrowLine = null,
+            clearanceLine = "내려도 됩니다",
+            speechLine = null,
+        ),
+        cards = cards,
+    )
+}
+
+private fun previewState(report: ParkingReport, cards: List<SummaryCard>): ParkUiState {
+    val gear = GearReading(rawValue = 4, gear = Gear.PARK, error = null)
+    return ParkUiState(
+        origin = DataOrigin.FAKE,
+        screen = AppScreen.SUMMARY,
+        gear = gear,
+        snapshot = VehicleSnapshot(ready = true),
+        session = CheckSession(phase = SessionPhase.ACTIVE, motionAllowed = true),
+        report = report,
+        scanning = false,
+        showManualCheck = false,
+        debugRows = emptyList(),
+        liveStatus = "",
+        vehicleStatus = "",
+        speechMode = "",
+        controlAvailable = false,
+        placeLabel = "",
+        cards = cards,
+    )
 }
