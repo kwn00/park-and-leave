@@ -1,0 +1,3 @@
+-keep class ai.pleos.playground.vehicle.api.implement.* { *; }
+-keepattributes *Annotation*
+-keepattributes Signature,InnerClasses,EnclosingMethod
