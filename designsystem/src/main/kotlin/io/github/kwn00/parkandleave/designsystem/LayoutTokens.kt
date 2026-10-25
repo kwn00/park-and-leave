@@ -19,12 +19,8 @@ object ParkLeaveSpace {
     val x10 = 80.dp
 
     val paneHorizontal = x4
-    val paneTop = x3
-    val paneBottom = x3
-    val gutter = x2
     /** Leaves a four-column cell 352 dp of text, enough for every action hint on one line. */
     val cardPadding = 20.dp
-    val panelPadding = x3
 }
 
 object ParkLeaveShapes {
@@ -48,9 +44,10 @@ object ParkLeaveDimens {
 
     val headerHeight = 64.dp
     val gearPillHeight = 48.dp
-    val cardMinHeight = 288.dp
     val heroBadge = 224.dp
     val heroBadgeIcon = 120.dp
+    val heroBadgeCompact = 160.dp
+    val heroBadgeIconCompact = 88.dp
     val statusTile = 144.dp
     val statusIcon = 80.dp
     val buttonHeight = 80.dp

@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.sp
  * a 20 sp title on a phone.
  *
  * Hangul comes from the CJK fallback font, whose fallback line spacing keeps a single
- * line at about 1.45 em even when [TextStyle.lineHeight] is smaller. Budget vertical
- * space with that height (a 48 sp title takes 70 dp), not with the line height token.
+ * line at about 1.45 em even when [TextStyle.lineHeight] is smaller (a 48 sp title takes
+ * 70 dp). Wrap summary text in [lineBox] so it occupies exactly its line height.
  */
 @Immutable
 data class ParkLeaveType(
@@ -25,12 +25,14 @@ data class ParkLeaveType(
     val gear: TextStyle,
     val headerAction: TextStyle,
     val headline: TextStyle,
+    val headlineCompact: TextStyle,
     val subline: TextStyle,
     val heroTitle: TextStyle,
     val heroSubline: TextStyle,
     val status: TextStyle,
     val sectionLabel: TextStyle,
     val cardTitle: TextStyle,
+    val cardTitleCompact: TextStyle,
     val cardBody: TextStyle,
     val cardHint: TextStyle,
     val chip: TextStyle,
@@ -67,14 +69,16 @@ fun parkLeaveType(): ParkLeaveType = ParkLeaveType(
     gear = style(28.sp, 36.sp, FontWeight.SemiBold, tracking = 1.2.sp, features = TABULAR),
     headerAction = style(28.sp, 36.sp, FontWeight.Medium),
     headline = style(80.sp, 88.sp, FontWeight.Bold, tracking = (-2).sp, features = TABULAR),
+    headlineCompact = style(64.sp, 72.sp, FontWeight.Bold, tracking = (-1.5).sp, features = TABULAR),
     subline = style(32.sp, 40.sp, FontWeight.Normal),
     heroTitle = style(120.sp, 128.sp, FontWeight.Bold, tracking = (-2.5).sp),
     heroSubline = style(52.sp, 64.sp, FontWeight.SemiBold, tracking = (-0.5).sp),
     status = style(72.sp, 88.sp, FontWeight.Bold, tracking = (-1.5).sp),
     sectionLabel = style(30.sp, 36.sp, FontWeight.Medium),
     cardTitle = style(48.sp, 56.sp, FontWeight.SemiBold, tracking = (-0.8).sp, features = TABULAR),
+    cardTitleCompact = style(42.sp, 50.sp, FontWeight.SemiBold, tracking = (-0.6).sp, features = TABULAR),
     cardBody = style(34.sp, 44.sp, FontWeight.Normal, tracking = (-0.3).sp, features = TABULAR),
-    cardHint = style(32.sp, 40.sp, FontWeight.SemiBold, tracking = (-0.4).sp),
+    cardHint = style(32.sp, 40.sp, FontWeight.Normal, tracking = (-0.3).sp),
     chip = style(30.sp, 36.sp, FontWeight.Medium),
     note = style(30.sp, 36.sp, FontWeight.Normal),
     noteEmphasis = style(30.sp, 36.sp, FontWeight.Medium),

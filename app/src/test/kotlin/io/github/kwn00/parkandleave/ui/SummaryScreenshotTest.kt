@@ -66,6 +66,18 @@ class SummaryScreenshotTest {
     fun eightCardsNight() = render("summary-eight-night", dark = true, ParkedScenarios.state(ParkedScenarios.eightIssues))
 
     @Test
+    fun twelveCardsDay() = render("summary-twelve-day", dark = false, ParkedScenarios.state(ParkedScenarios.twelveIssues))
+
+    @Test
+    fun twelveCardsNight() = render("summary-twelve-night", dark = true, ParkedScenarios.state(ParkedScenarios.twelveIssues))
+
+    @Test
+    fun fourteenCardsDay() = render("summary-fourteen-day", dark = false, ParkedScenarios.state(ParkedScenarios.fourteenIssues))
+
+    @Test
+    fun fourteenCardsNight() = render("summary-fourteen-night", dark = true, ParkedScenarios.state(ParkedScenarios.fourteenIssues))
+
+    @Test
     fun allClearDay() = render("summary-clear-day", dark = false, previewAllClear(resolved = false, unchecked))
 
     @Test

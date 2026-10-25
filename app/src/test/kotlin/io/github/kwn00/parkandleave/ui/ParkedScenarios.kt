@@ -16,6 +16,7 @@ import io.github.kwn00.parkandleave.domain.VehicleArea
 import io.github.kwn00.parkandleave.domain.VehicleSnapshot
 import io.github.kwn00.parkandleave.domain.WindowReading
 import io.github.kwn00.parkandleave.domain.confirmedLabels
+import io.github.kwn00.parkandleave.domain.rememberSeen
 import io.github.kwn00.parkandleave.domain.summaryCards
 
 /** Vehicle readings run through the real evaluator, so screens show the strings the app ships. */
@@ -169,6 +170,56 @@ internal object ParkedScenarios {
             ),
         ),
     )
+
+    /**
+     * Every check except the grouped telltale fails, most with two places so their bodies take two
+     * lines. Telltales read clean, so the panel still has a chip above the unchecked line.
+     */
+    val fourteenIssues: VehicleSnapshot = everyItemManyPlaces.first().let { many ->
+        many.copy(
+            doors = many.doors + DoorReading(VehicleArea.HOOD, position = 1, locked = true),
+            telltales = listOf(TelltaleReading(TelltaleKind.ENGINE, active = false, rawName = "ENGINE")),
+            tripDistance = null,
+            unread = listOf(UnreadSignal(SignalSource.TRIP, UnreadCause.NOT_AVAILABLE)),
+        )
+    }
+
+    /** Charge and fuel recover: twelve cards, three rows, three chips. */
+    val twelveIssues: VehicleSnapshot = fourteenIssues.copy(socPercent = 80, fuelPercent = 60)
+
+    /** Everything read and fine, telltales included, so leftover checks become chips. */
+    private val allRead: VehicleSnapshot = calm.copy(
+        washerLow = false,
+        telltales = fourteenIssues.telltales,
+        unread = fourteenIssues.unread,
+    )
+
+    /**
+     * The tallest summary for [count] cards: the first [count] of [fourteenIssues] in evaluator
+     * order put a two-line body in every row, the headline carries both context lines, and the
+     * panel shows every remaining chip and the unchecked line.
+     */
+    fun tallest(count: Int): ParkUiState {
+        val report = ParkingCheckEvaluator().evaluate(fourteenIssues)
+        val cards = summaryCards(report, seen = emptyList()).take(count)
+        return previewState(
+            report = report.copy(items = report.items.take(count), headline = "확인 ${count}건"),
+            cards = cards,
+            confirmed = confirmedLabels(allRead, cards.map { it.id }.toSet()),
+        )
+    }
+
+    /** All clear after [count] issues were fixed in this parked session. */
+    fun resolved(count: Int): ParkUiState {
+        val seen = rememberSeen(emptyList(), ParkingCheckEvaluator().evaluate(fourteenIssues).items.take(count))
+        val report = ParkingCheckEvaluator().evaluate(allRead)
+        val cards = summaryCards(report, seen)
+        return previewState(
+            report = report,
+            cards = cards,
+            confirmed = confirmedLabels(allRead, cards.map { it.id }.toSet()),
+        )
+    }
 
     fun state(snapshot: VehicleSnapshot): ParkUiState {
         val report = ParkingCheckEvaluator().evaluate(snapshot)

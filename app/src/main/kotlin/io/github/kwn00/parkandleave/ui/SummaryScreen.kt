@@ -3,10 +3,10 @@ package io.github.kwn00.parkandleave.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -21,10 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -38,8 +34,7 @@ import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +42,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import io.github.kwn00.parkandleave.designsystem.ParkIcon
 import io.github.kwn00.parkandleave.designsystem.ParkIconKind
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveColors
@@ -55,8 +49,10 @@ import io.github.kwn00.parkandleave.designsystem.ParkLeaveDimens
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveShapes
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveSpace
 import io.github.kwn00.parkandleave.designsystem.ParkLeaveTheme
+import io.github.kwn00.parkandleave.designsystem.SummaryDensity
 import io.github.kwn00.parkandleave.designsystem.keepPhrasesTogether
 import io.github.kwn00.parkandleave.designsystem.keepWordsTogether
+import io.github.kwn00.parkandleave.designsystem.lineBox
 import io.github.kwn00.parkandleave.domain.CardTone
 import io.github.kwn00.parkandleave.domain.CheckSession
 import io.github.kwn00.parkandleave.domain.Gear
@@ -83,16 +79,21 @@ fun SummaryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(
-                start = ParkLeaveSpace.paneHorizontal,
-                end = ParkLeaveSpace.paneHorizontal,
-                top = ParkLeaveSpace.paneTop,
-            ),
+            .padding(horizontal = ParkLeaveSpace.paneHorizontal),
     ) {
         val width = maxWidth
-        Column(Modifier.fillMaxSize()) {
+        val density = if (state.session.phase == SessionPhase.ACTIVE) {
+            summaryDensity(state.cards.size, width)
+        } else {
+            SummaryDensity.Regular
+        }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(top = density.paneTop),
+        ) {
             SummaryHeader(state, onOpenDebug)
-            Spacer(Modifier.height(ParkLeaveSpace.x2))
+            Spacer(Modifier.height(density.headerGap))
             when (state.session.phase) {
                 SessionPhase.FROZEN -> StatusMessage(
                     text = "주행 중에는 점검을 멈춥니다",
@@ -113,14 +114,17 @@ fun SummaryScreen(
                         null
                     },
                 )
-                SessionPhase.ACTIVE -> ActiveSummary(
-                    state = state,
-                    width = width,
-                    modifier = Modifier.weight(1f),
-                )
+                SessionPhase.ACTIVE -> ActiveSummary(state, width, density)
             }
         }
     }
+}
+
+/** Rows come from the card count at a fixed four-column cell; more rows, denser band. */
+internal fun summaryDensity(cardCount: Int, contentWidth: Dp): SummaryDensity {
+    if (cardCount == 0) return SummaryDensity.Regular
+    val columns = summaryGridColumns(contentWidth.value.toInt(), cardCount).coerceAtLeast(1)
+    return SummaryDensity.forRows((cardCount + columns - 1) / columns)
 }
 
 @Composable
@@ -184,46 +188,51 @@ private fun GearPill(state: ParkUiState) {
     }
 }
 
+/**
+ * The summary never scrolls. Content keeps its natural height, top-aligned, and
+ * [SummaryDensity] is chosen so that height stays inside the pane for up to fourteen cards.
+ */
 @Composable
-private fun ActiveSummary(state: ParkUiState, width: Dp, modifier: Modifier) {
+private fun ColumnScope.ActiveSummary(state: ParkUiState, width: Dp, density: SummaryDensity) {
     val report = state.report
     if (state.scanning || report == null) {
-        StatusMessage("점검 중", icon = null, modifier = modifier)
+        StatusMessage("점검 중", icon = null, modifier = Modifier.weight(1f))
         return
     }
-    val calm = report.allClear && state.cards.isEmpty()
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val viewport = maxHeight
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            Column(
-                modifier = Modifier
-                    .heightIn(min = viewport)
-                    .padding(bottom = if (calm) ParkLeaveDimens.headerHeight else ParkLeaveSpace.paneBottom),
-                verticalArrangement = if (calm) Arrangement.Center else Arrangement.Top,
-            ) {
-                if (report.allClear) {
-                    AllClearHero(report)
-                    if (state.cards.isNotEmpty()) {
-                        Spacer(Modifier.height(ParkLeaveSpace.x5))
-                        SectionLabel("해결된 항목")
-                        Spacer(Modifier.height(ParkLeaveSpace.x2))
-                        CardGrid(state.cards, width)
-                    }
-                } else {
-                    IssueHeadline(state, report)
-                    if (state.cards.isNotEmpty()) {
-                        Spacer(Modifier.height(ParkLeaveSpace.x3))
-                        CardGrid(state.cards, width)
-                    }
-                }
-                ConfirmedPanel(state, top = if (calm) ParkLeaveSpace.x6 else ParkLeaveSpace.gutter)
-            }
+    if (report.allClear && state.cards.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(bottom = ParkLeaveDimens.headerHeight),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            AllClearHero(report, compact = false)
+            ConfirmedPanel(state, density, top = ParkLeaveSpace.x6)
         }
+        return
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = density.paneBottom),
+    ) {
+        if (report.allClear) {
+            AllClearHero(report, compact = true)
+            Spacer(Modifier.height(density.sectionGap))
+            SectionLabel("해결된 항목")
+            Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+        } else {
+            IssueHeadline(state, report, density)
+            if (state.cards.isNotEmpty()) Spacer(Modifier.height(density.headlineGap))
+        }
+        CardGrid(state.cards, width, density)
+        ConfirmedPanel(state, density, top = density.panelGap)
     }
 }
 
 @Composable
-private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
+private fun IssueHeadline(state: ParkUiState, report: ParkingReport, density: SummaryDensity) {
     val colors = ParkLeaveTheme.colors
     val type = ParkLeaveTheme.type
     val tone = headlineTone(report.allClear, state.cards)
@@ -233,15 +242,13 @@ private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
             add("직접 조치하면 카드가 갱신됩니다" to colors.onSurfaceMuted)
         }
     }
-    // Context sits beside the count, on its baseline, so two rows of cards keep the panel on screen.
+    // Context sits beside the count, on its baseline, so the count costs one line of height.
     Row(Modifier.fillMaxWidth()) {
-        Text(
+        BoxedText(
             emphasizeCount(report.headline, headlineAccent(tone, colors)),
-            modifier = Modifier.alignBy(LastBaseline),
-            style = type.headline,
+            style = if (density.compactHeadline) type.headlineCompact else type.headline,
             color = colors.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.alignBy(LastBaseline),
         )
         if (context.isNotEmpty()) {
             Spacer(Modifier.width(ParkLeaveSpace.x6))
@@ -252,17 +259,39 @@ private fun IssueHeadline(state: ParkUiState, report: ParkingReport) {
                 verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.half),
             ) {
                 context.forEach { (line, color) ->
-                    Text(
-                        line.keepWordsTogether(),
-                        style = type.subline,
-                        color = color,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    BoxedText(line.keepWordsTogether(), style = type.subline, color = color)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BoxedText(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
+) = BoxedText(AnnotatedString(text), style, color, modifier, maxLines)
+
+/** Summary text measured at its token line height; see [lineBox]. */
+@Composable
+private fun BoxedText(
+    text: AnnotatedString,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
+) {
+    Text(
+        text,
+        modifier = modifier.lineBox(style.lineHeight),
+        style = style,
+        color = color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** The count in "확인 3건" carries the severity hue; the rest of the headline stays ink. */
@@ -276,28 +305,34 @@ private fun emphasizeCount(headline: String, accent: Color): AnnotatedString {
 }
 
 @Composable
-private fun AllClearHero(report: ParkingReport) {
+private fun AllClearHero(report: ParkingReport, compact: Boolean) {
     val colors = ParkLeaveTheme.colors
     val type = ParkLeaveTheme.type
+    val badge = if (compact) ParkLeaveDimens.heroBadgeCompact else ParkLeaveDimens.heroBadge
+    val badgeIcon = if (compact) ParkLeaveDimens.heroBadgeIconCompact else ParkLeaveDimens.heroBadgeIcon
+    // The compact hero sits above resolved cards, so its text keeps to its line boxes too.
+    val box = if (compact) Modifier.lineBox(type.heroTitle.lineHeight) else Modifier
+    val subBox = if (compact) Modifier.lineBox(type.heroSubline.lineHeight) else Modifier
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = ParkLeaveSpace.x2),
+            .padding(vertical = if (compact) 0.dp else ParkLeaveSpace.x2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(ParkLeaveDimens.heroBadge)
+                .size(badge)
                 .clip(ParkLeaveShapes.pill)
                 .background(colors.okTint),
             contentAlignment = Alignment.Center,
         ) {
-            ParkIcon(ParkIconKind.CHECK, colors.ok, Modifier.size(ParkLeaveDimens.heroBadgeIcon))
+            ParkIcon(ParkIconKind.CHECK, colors.ok, Modifier.size(badgeIcon))
         }
-        Spacer(Modifier.width(ParkLeaveSpace.x6))
+        Spacer(Modifier.width(if (compact) ParkLeaveSpace.x5 else ParkLeaveSpace.x6))
         Column {
             Text(
                 report.headline,
+                modifier = box,
                 style = type.heroTitle,
                 color = colors.onSurface,
                 maxLines = 1,
@@ -305,7 +340,13 @@ private fun AllClearHero(report: ParkingReport) {
             )
             report.clearanceLine?.let { line ->
                 Spacer(Modifier.height(ParkLeaveSpace.x2))
-                Text(line.keepWordsTogether(), style = type.heroSubline, color = colors.ok, maxLines = 1)
+                Text(
+                    line.keepWordsTogether(),
+                    modifier = subBox,
+                    style = type.heroSubline,
+                    color = colors.ok,
+                    maxLines = 1,
+                )
             }
             report.tomorrowLine?.let { line ->
                 Spacer(Modifier.height(ParkLeaveSpace.x2))
@@ -322,18 +363,18 @@ private fun AllClearHero(report: ParkingReport) {
 }
 
 @Composable
-internal fun CardGrid(cards: List<SummaryCard>, width: Dp) {
+internal fun CardGrid(cards: List<SummaryCard>, width: Dp, density: SummaryDensity) {
     if (cards.isEmpty()) return
     val columns = summaryGridColumns(width.value.toInt(), cards.size).coerceAtLeast(1)
-    val cardWidth = cardWidth(width, columns)
-    Column(verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.gutter)) {
+    val cardWidth = cardWidth(width, columns, density.gutter)
+    Column(verticalArrangement = Arrangement.spacedBy(density.gutter)) {
         for (row in cards.chunked(columns)) {
             Row(
                 modifier = Modifier.height(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(ParkLeaveSpace.gutter),
+                horizontalArrangement = Arrangement.spacedBy(density.gutter),
             ) {
                 for (card in row) {
-                    CheckCard(card, Modifier.width(cardWidth).fillMaxHeight())
+                    CheckCard(card, density, Modifier.width(cardWidth).fillMaxHeight())
                 }
             }
         }
@@ -395,7 +436,7 @@ private fun cardLook(card: SummaryCard, colors: ParkLeaveColors): CardLook {
 }
 
 @Composable
-private fun CheckCard(card: SummaryCard, modifier: Modifier) {
+private fun CheckCard(card: SummaryCard, density: SummaryDensity, modifier: Modifier) {
     val colors = ParkLeaveTheme.colors
     val type = ParkLeaveTheme.type
     val look = cardLook(card, colors)
@@ -404,109 +445,99 @@ private fun CheckCard(card: SummaryCard, modifier: Modifier) {
     } else {
         "${card.title}. ${card.detail}"
     }
+    val titleStyle = if (density.compactTitle) type.cardTitleCompact else type.cardTitle
     Column(
         modifier = modifier
-            .heightIn(min = if (card.resolved) 0.dp else ParkLeaveDimens.cardMinHeight)
             .clip(ParkLeaveShapes.card)
             .background(colors.surface)
             .border(look.edgeWidth, look.edge, ParkLeaveShapes.card)
             .semantics { contentDescription = spoken }
-            .padding(ParkLeaveSpace.cardPadding),
+            .padding(horizontal = ParkLeaveSpace.cardPadding, vertical = density.cardPadding),
     ) {
-        IconTile(look.icon, look.iconTint, look.tileColor)
-        Spacer(Modifier.height(ParkLeaveSpace.x1Half))
-        Text(
-            card.title.keepWordsTogether(),
-            style = type.cardTitle,
-            color = look.title,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(ParkLeaveSpace.half))
-        Text(
+        if (density.iconBesideTitle) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(look.icon, look.iconTint, look.tileColor, density)
+                Spacer(Modifier.width(density.tileGap))
+                BoxedText(card.title.keepWordsTogether(), style = titleStyle, color = look.title)
+            }
+        } else {
+            IconTile(look.icon, look.iconTint, look.tileColor, density)
+            Spacer(Modifier.height(density.tileGap))
+            BoxedText(card.title.keepWordsTogether(), style = titleStyle, color = look.title, maxLines = 2)
+        }
+        Spacer(Modifier.height(density.titleGap))
+        BoxedText(
             card.detail.keepPhrasesTogether(),
-            style = type.cardBody,
+            style = type.cardBody.copy(lineHeight = density.bodyLineHeight),
             color = look.detail,
             maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
         )
         if (card.guidance.isNotBlank()) {
-            Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+            Spacer(Modifier.height(density.ruleGap))
             Spacer(Modifier.weight(1f))
-            ActionHint(card.guidance)
+            ActionHint(card.guidance, density)
         }
     }
 }
 
 @Composable
-private fun IconTile(icon: ParkIconKind, tint: Color, container: Color) {
+private fun IconTile(icon: ParkIconKind, tint: Color, container: Color, density: SummaryDensity) {
     Box(
         modifier = Modifier
-            .size(ParkLeaveDimens.iconTile)
+            .size(density.iconTile)
             .clip(ParkLeaveShapes.tile)
             .background(container),
         contentAlignment = Alignment.Center,
     ) {
-        ParkIcon(icon, tint, Modifier.size(ParkLeaveDimens.icon))
+        ParkIcon(icon, tint, Modifier.size(density.icon))
     }
 }
 
 /** Width of one grid cell for [contentWidth] split into [columns]. */
-internal fun cardWidth(contentWidth: Dp, columns: Int): Dp =
-    ((contentWidth - ParkLeaveSpace.gutter * (columns - 1)) / columns).coerceAtLeast(0.dp)
+internal fun cardWidth(contentWidth: Dp, columns: Int, gutter: Dp): Dp =
+    ((contentWidth - gutter * (columns - 1)) / columns).coerceAtLeast(0.dp)
 
 /** Text measure inside a card, after its padding. */
-internal fun cardTextWidth(contentWidth: Dp, columns: Int): Dp =
-    (cardWidth(contentWidth, columns) - ParkLeaveSpace.cardPadding * 2).coerceAtLeast(0.dp)
+internal fun cardTextWidth(contentWidth: Dp, columns: Int, density: SummaryDensity): Dp =
+    (cardWidth(contentWidth, columns, density.gutter) - ParkLeaveSpace.cardPadding * 2).coerceAtLeast(0.dp)
 
-private const val HINT_ARROW = "hint-arrow"
-
-/** The arrow cell includes its own gap, so no space character is spent before it. */
-internal val HintArrowPlaceholder = Placeholder(
-    width = 0.85.em,
-    height = 0.85.em,
-    placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
-)
-
-internal fun actionHintText(guidance: String): AnnotatedString = buildAnnotatedString {
-    append(guidance.keepWordsTogether())
-    appendInlineContent(HINT_ARROW, "→")
+/** Title measure, which loses the tile and its gap when the tile sits beside it. */
+internal fun cardTitleWidth(contentWidth: Dp, columns: Int, density: SummaryDensity): Dp {
+    val text = cardTextWidth(contentWidth, columns, density)
+    return if (density.iconBesideTitle) (text - density.iconTile - density.tileGap).coerceAtLeast(0.dp) else text
 }
 
+/**
+ * What the driver should do. It is not tappable, so it reads as guidance rather than a link:
+ * ink instead of accent, regular weight, no arrow, set off from the state line by a hairline.
+ */
 @Composable
-private fun ActionHint(text: String) {
+private fun ActionHint(text: String, density: SummaryDensity) {
     val colors = ParkLeaveTheme.colors
-    val arrow = mapOf(
-        HINT_ARROW to InlineTextContent(HintArrowPlaceholder) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                ParkIcon(ParkIconKind.ARROW, colors.accent, Modifier.fillMaxHeight(0.92f).aspectRatio(1f))
-            }
-        },
-    )
-    Text(
-        actionHintText(text),
-        inlineContent = arrow,
-        style = ParkLeaveTheme.type.cardHint,
-        color = colors.accent,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+    Column {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(ParkLeaveDimens.hairline)
+                .background(colors.hairline),
+        )
+        Spacer(Modifier.height(density.hintGap))
+        BoxedText(
+            text.keepWordsTogether(),
+            style = ParkLeaveTheme.type.cardHint.copy(lineHeight = density.hintLineHeight),
+            color = colors.onSurface,
+        )
+    }
 }
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = ParkLeaveTheme.type.sectionLabel,
-        color = ParkLeaveTheme.colors.onSurfaceMuted,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+    BoxedText(text, style = ParkLeaveTheme.type.sectionLabel, color = ParkLeaveTheme.colors.onSurfaceMuted)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ConfirmedPanel(state: ParkUiState, top: Dp) {
+private fun ConfirmedPanel(state: ParkUiState, density: SummaryDensity, top: Dp) {
     val colors = ParkLeaveTheme.colors
     val note = uncheckedNote(state.report?.uncheckedLines.orEmpty())
     if (state.confirmed.isEmpty() && note == null) return
@@ -517,28 +548,40 @@ private fun ConfirmedPanel(state: ParkUiState, top: Dp) {
             .clip(ParkLeaveShapes.panel)
             .background(colors.surface)
             .border(ParkLeaveDimens.hairline, colors.hairline, ParkLeaveShapes.panel)
-            .padding(ParkLeaveSpace.panelPadding),
+            .padding(density.panelPadding),
     ) {
         if (state.confirmed.isNotEmpty()) {
-            SectionLabel("정상으로 확인된 항목")
-            Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+            if (!density.labelBesideChips) {
+                SectionLabel("정상으로 확인된 항목")
+                Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+            }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(ParkLeaveSpace.x1Half),
                 verticalArrangement = Arrangement.spacedBy(ParkLeaveSpace.x1Half),
             ) {
-                state.confirmed.forEach { label -> ConfirmedChip(label) }
+                if (density.labelBesideChips) {
+                    Box(
+                        Modifier
+                            .height(density.chipHeight)
+                            .padding(end = ParkLeaveSpace.x1),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        SectionLabel("정상으로 확인된 항목")
+                    }
+                }
+                state.confirmed.forEach { label -> ConfirmedChip(label, density.chipHeight) }
             }
         }
         if (note != null) {
             if (state.confirmed.isNotEmpty()) {
-                Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+                Spacer(Modifier.height(density.panelRuleGap))
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .height(ParkLeaveDimens.hairline)
                         .background(colors.hairline),
                 )
-                Spacer(Modifier.height(ParkLeaveSpace.x1Half))
+                Spacer(Modifier.height(density.panelRuleGap))
             }
             UncheckedNote(note)
         }
@@ -546,11 +589,11 @@ private fun ConfirmedPanel(state: ParkUiState, top: Dp) {
 }
 
 @Composable
-private fun ConfirmedChip(label: String) {
+private fun ConfirmedChip(label: String, height: Dp) {
     val colors = ParkLeaveTheme.colors
     Row(
         modifier = Modifier
-            .height(ParkLeaveDimens.chipHeight)
+            .height(height)
             .clip(ParkLeaveShapes.pill)
             .background(colors.surfaceMuted)
             .semantics { contentDescription = "$label 정상" }
@@ -581,13 +624,7 @@ private fun UncheckedNote(note: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ParkIcon(ParkIconKind.INFO, colors.onSurfaceSubtle, Modifier.size(ParkLeaveDimens.noteIcon))
         Spacer(Modifier.width(ParkLeaveSpace.x2))
-        Text(
-            text,
-            style = type.note,
-            color = colors.onSurfaceSubtle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        BoxedText(text, style = type.note, color = colors.onSurfaceSubtle)
     }
 }
 
