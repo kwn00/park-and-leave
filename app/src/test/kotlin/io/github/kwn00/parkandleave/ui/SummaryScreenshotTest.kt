@@ -35,6 +35,12 @@ class SummaryScreenshotTest {
     fun twoCardsNight() = shoot("summary-two-night", dark = true, count = 2)
 
     @Test
+    fun threeCardsDay() = shoot("summary-three-day", dark = false, count = 3)
+
+    @Test
+    fun threeCardsNight() = shoot("summary-three-night", dark = true, count = 3)
+
+    @Test
     fun fiveCardsDay() = shoot("summary-five-day", dark = false, count = 5)
 
     @Test

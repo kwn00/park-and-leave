@@ -60,6 +60,7 @@ class SummaryBoardTest {
         assertTrue(cards.any { it.tone == CardTone.WARN })
         assertTrue(cards.none { it.resolved })
         assertEquals(report.items.map { it.id }, cards.map { it.id })
+        assertEquals("뒷좌석을 확인하세요", cards.first().hint)
         assertEquals(HeadlineTone.CRITICAL, headlineTone(report.allClear, cards))
     }
 
@@ -75,11 +76,13 @@ class SummaryBoardTest {
 
         assertEquals(SignalId.READING_LIGHT, cards.first().id)
         assertEquals(CardTone.WARN, cards.first().tone)
+        assertEquals("독서등을 꺼 주세요", cards.first().hint)
         assertFalse(cards.first().resolved)
 
         val resolved = cards.single { it.id == SignalId.WINDOW }
         assertEquals(CardTone.INFO, resolved.tone)
         assertEquals(RESOLVED_DETAIL, resolved.detail)
+        assertEquals("", resolved.hint)
         assertTrue(resolved.resolved)
         assertEquals("창문 열림", resolved.title)
         assertEquals(HeadlineTone.WARN, headlineTone(after.allClear, cards))

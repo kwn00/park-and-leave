@@ -25,6 +25,7 @@ data class SummaryCard(
     val title: String,
     val detail: String,
     val resolved: Boolean,
+    val hint: String = "",
 )
 
 const val RESOLVED_DETAIL: String = "해결됨"
@@ -103,6 +104,7 @@ fun summaryCards(report: ParkingReport, seen: List<SeenIssue>): List<SummaryCard
             title = item.title,
             detail = item.detail,
             resolved = false,
+            hint = item.guidance,
         )
     }
     val resolved = seen

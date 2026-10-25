@@ -1,5 +1,6 @@
 package io.github.kwn00.parkandleave.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +21,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.kwn00.parkandleave.designsystem.LocalParkLeaveColors
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveCorner
+import io.github.kwn00.parkandleave.designsystem.ParkLeaveDimen
 import io.github.kwn00.parkandleave.domain.FakePreset
 import io.github.kwn00.parkandleave.domain.Gear
 
@@ -84,7 +88,7 @@ fun DebugScreen(
                 maxLines = 1,
             )
             state.gear.error?.let { error ->
-                Text(error, style = MaterialTheme.typography.bodyLarge, color = colors.onCritical, maxLines = 3)
+                Text(error, style = MaterialTheme.typography.bodyLarge, color = colors.critical, maxLines = 3)
             }
         }
         itemsIndexed(state.debugRows, key = { index, row -> "$index:${row.label}:${row.value}" }) { _, row ->
@@ -127,9 +131,16 @@ fun DebugScreen(
 
 @Composable
 private fun ActionButton(label: String, onClick: () -> Unit, modifier: Modifier) {
+    val colors = LocalParkLeaveColors.current
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 64.dp),
+        modifier = modifier.heightIn(min = ParkLeaveDimen.touch),
+        shape = ParkLeaveCorner,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colors.buttonContainer,
+            contentColor = colors.buttonContent,
+        ),
+        border = BorderStroke(ParkLeaveDimen.border, colors.buttonBorder),
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }
