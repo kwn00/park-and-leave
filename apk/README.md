@@ -15,7 +15,7 @@ apk/ParkAndLeave_release.apk
 | `PARK_LEAVE_KEY_ALIAS` | 키 별칭 |
 | `PARK_LEAVE_KEY_PASSWORD` | 키 비밀번호 |
 
-네 값이 모두 있고 파일이 있으면 `assembleRelease`가 그 키스토어로 서명합니다. 하나라도 없으면 빌드는 실패하지 않고 디버그 키스토어로 서명합니다. 그 APK도 에뮬레이터에 설치할 수 있습니다. 이 폴더의 `ParkAndLeave_release.apk`는 키스토어 변수가 없을 때 만든 그 서명본입니다. 콘테스트 키가 있으면 같은 이름으로 바꾸면 됩니다.
+네 값이 모두 있고 파일이 있으면 `assembleRelease`가 그 키스토어로 서명합니다. 하나라도 없으면 빌드는 실패하지 않고 디버그 키스토어로 서명합니다. 그 APK도 에뮬레이터에 설치할 수 있습니다. 이 폴더의 `ParkAndLeave_release.apk`는 프로젝트 release 키로 서명한 release 빌드입니다. 서명 인증서 DN은 `CN=Park and Leave, O=Park and Leave, C=KR`입니다. `apksigner verify --print-certs apk/ParkAndLeave_release.apk`로 확인할 수 있습니다.
 
 ```bash
 ./gradlew assembleRelease
