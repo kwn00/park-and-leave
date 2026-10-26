@@ -8,6 +8,13 @@
 
 [시연 영상(mp4, 60초)](docs/demo/park-and-leave-demo.mp4): Pleos Connect Emulator 2.1.0에서 가상 콘솔로 신호를 바꾸며 찍었습니다. D단 제한 화면, P단 카드 10장, 하나씩 해결해 "확인된 이상 없음"까지 이어집니다.
 
+## 제출용 APK
+
+- 위치: [`apk/ParkAndLeave_release.apk`](apk/ParkAndLeave_release.apk)
+- release 빌드이며 프로젝트 release 키로 서명했습니다(디버그 키 아님). 인증서 DN은 `CN=Park and Leave, O=Park and Leave, C=KR`이고, `apksigner verify --print-certs apk/ParkAndLeave_release.apk`로 확인할 수 있습니다.
+- 설치: Pleos Connect Emulator를 Cold boot로 띄운 뒤 `adb install -r apk/ParkAndLeave_release.apk`
+- 서명과 다시 만드는 방법은 [`apk/README.md`](apk/README.md)에 있습니다.
+
 ## 기능
 
 - P에 들어가면 차량 상태를 한 번 읽고, P를 벗어났다가 다시 들어오면 다시 읽습니다.
@@ -100,7 +107,7 @@ adb shell am start -n io.github.kwn00.parkandleave/.MainActivity
 adb forward tcp:8088 tcp:8088
 ```
 
-브라우저에서 `http://127.0.0.1:8088/` 을 열고 Gear, 도어, 잠금, 창문, 조명, 공조, 배터리, 연료, 타이어를 바꿉니다. Quick boot에서는 차량 신호가 오지 않을 수 있습니다. 데모 촬영 순서는 `docs/demo-scenario.md`에 있습니다.
+브라우저에서 `http://127.0.0.1:8088/` 을 열고 Gear, 도어·보닛(FRUNK)·트렁크, 잠금, 창문, 실내등·독서등·외부등, 공조, 배터리 SOC를 바꿉니다. Virtual Console에는 타이어 공기압, 워셔액, 연료 잔량을 바꾸는 조작 항목이 없어서, 에뮬레이터에서는 이 세 카드를 띄울 수 없습니다. 이 카드들은 점검 규칙 단위 테스트(`domain`)와 화면 스냅샷 테스트(카드 13장 화면 포함)로 검증합니다. 에뮬레이터는 워셔액과 트립 거리 값도 주지 않으므로, 콘솔로 띄운 카드를 모두 해결하면 "모두 정상" 대신 "확인된 이상 없음"과 "확인할 수 없는 항목: 경고등, 워셔액, 주행 거리"가 나옵니다. Quick boot에서는 차량 신호가 오지 않을 수 있습니다. 데모 촬영 순서는 `docs/demo-scenario.md`에 있습니다.
 
 요약 화면의 **신호 디버그**는 `GEAR_SELECTION` raw 값과 읽은 신호를 보여 줍니다. **모의**는 에뮬레이터 없이 카드를 볼 때 쓰는 가짜 데이터입니다. 모의 모드에는 주행 제한을 적용하지 않습니다.
 
